@@ -1,13 +1,20 @@
+
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
-import { UserProfile, UserRole, ProfessionalStatus, BusinessType } from './types';
+import { UserProfile, UserRole, ProfessionalStatus, BusinessType, Product, ProductCategory, VeterinarianProfile, VendorProfile, Clinic } from './types';
 import * as ApiService from './services/geminiService';
 import { SIDENAV_ITEMS, ICONS } from './constants';
 import Header from './components/Header';
 
-// FIX: Add global declaration for window.google to fix TypeScript errors.
+// Add global declarations to fix TypeScript errors.
 declare global {
   interface Window {
     google: any;
+  }
+  // FIX: Add type definition for import.meta.env to resolve TypeScript error.
+  interface ImportMeta {
+    readonly env: {
+      readonly VITE_GOOGLE_MAPS_API_KEY: string;
+    };
   }
 }
 
@@ -83,19 +90,44 @@ const Spinner: React.FC = () => (
     </div>
 );
 
-const Badge: React.FC<{ status: ProfessionalStatus }> = ({ status }) => {
-    const statusStyles = {
+const Badge: React.FC<{ status: ProfessionalStatus | string }> = ({ status }) => {
+    const statusStyles: { [key: string]: string } = {
         [ProfessionalStatus.Pending]: 'bg-yellow-100 text-yellow-800',
         [ProfessionalStatus.Approved]: 'bg-green-100 text-green-800',
         [ProfessionalStatus.Rejected]: 'bg-red-100 text-red-800',
         [ProfessionalStatus.Suspended]: 'bg-gray-100 text-gray-800',
+        'draft': 'bg-blue-100 text-blue-800',
+        'out_of_stock': 'bg-orange-100 text-orange-800',
     };
     return (
-        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`}>
-            {status}
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${statusStyles[status] || 'bg-gray-100 text-gray-800'}`}>
+            {status.replace('_', ' ')}
         </span>
     );
 };
+
+const Modal: React.FC<{isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode}> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex justify-center items-center p-4" aria-modal="true" role="dialog">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // --- LAYOUT COMPONENTS ---
 
@@ -131,7 +163,16 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
             case 'verification':
                  if (user.role === UserRole.Admin) return <VerificationQueue />;
                  return <p>Access Denied</p>
-            // Add other pages here
+            case 'profile':
+                 if (user.role === UserRole.Veterinarian) return <MyProfileVet />;
+                 if (user.role === UserRole.Vendor) return <MyProfileVendor />;
+                 return <p>No profile page available.</p>;
+            case 'availability':
+                 if (user.role === UserRole.Veterinarian) return <Availability />;
+                 return <p>Access Denied</p>;
+            case 'products':
+                 if (user.role === UserRole.Vendor) return <Products />;
+                 return <p>Access Denied</p>;
             default:
                 return <ProfessionalDashboard />;
         }
@@ -187,7 +228,9 @@ const ProfessionalDashboard: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-800">Your profile status:</h3>
                     <Badge status={profile?.status || ProfessionalStatus.Pending} />
                 </div>
-                <p className="text-gray-600 mt-2">Your profile is currently being reviewed by our team. You will be notified once the status changes.</p>
+                 {profile?.status === ProfessionalStatus.Pending && <p className="text-gray-600 mt-2">Your profile is currently being reviewed by our team. You will be notified once the status changes.</p>}
+                 {profile?.status === ProfessionalStatus.Approved && <p className="text-gray-600 mt-2">Your profile is approved and visible to customers. Welcome aboard!</p>}
+                 {profile?.status === ProfessionalStatus.Rejected && <p className="text-red-600 mt-2">Unfortunately, your profile could not be approved at this time. Please check your email for more details.</p>}
             </div>
         </div>
     )
@@ -234,7 +277,9 @@ const VerificationQueue: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {profiles.map(p => (
+                        {profiles.length === 0 ? (
+                            <tr><td colSpan={5} className="text-center py-8 text-gray-500">No pending verifications.</td></tr>
+                        ) : profiles.map(p => (
                             <tr key={p.auth_user_id}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm font-medium text-gray-900">{p.veterinarian_profile?.full_name || p.vendor_profile?.business_name}</div>
@@ -258,6 +303,7 @@ const VerificationQueue: React.FC = () => {
 const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, onStatusUpdate: (userId: string, status: ProfessionalStatus) => void }> = ({ profile, onBack, onStatusUpdate }) => {
     const details = profile.veterinarian_profile || profile.vendor_profile;
     const isVet = !!profile.veterinarian_profile;
+    const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
 
     return (
         <div>
@@ -289,13 +335,28 @@ const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, 
                 )}
 
                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mt-4">Documents</h3>
-                 <p className="text-gray-500">Document viewer would be here. Mock documents are considered valid.</p>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   {profile.verification_documents?.length > 0 ? (
+                      profile.verification_documents.map(doc => (
+                        <button key={doc.id} onClick={() => setPreviewDocUrl(doc.document_url)} className="border rounded-lg p-3 text-center hover:bg-gray-50 transition-colors">
+                          <p className="font-medium text-blue-600 capitalize">{doc.document_type.replace('_', ' ')}</p>
+                          <p className="text-xs text-gray-500">Click to preview</p>
+                        </button>
+                      ))
+                   ) : (
+                     <p className="text-gray-500 col-span-full">No documents uploaded.</p>
+                   )}
+                 </div>
             </div>
 
             <div className="mt-6 flex space-x-4">
                  <button onClick={() => onStatusUpdate(profile.auth_user_id, ProfessionalStatus.Approved)} className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">Approve</button>
                  <button onClick={() => onStatusUpdate(profile.auth_user_id, ProfessionalStatus.Rejected)} className="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Reject</button>
             </div>
+            
+             <Modal isOpen={!!previewDocUrl} onClose={() => setPreviewDocUrl(null)} title="Document Preview">
+                {previewDocUrl && <img src={previewDocUrl} alt="Document Preview" className="w-full h-auto rounded-md" />}
+            </Modal>
         </div>
     );
 };
@@ -358,7 +419,7 @@ const GoogleMapsApiKeyPrompt: React.FC = () => (
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Google Maps API Key Required</h2>
       <p className="text-gray-600 mb-6">
         This feature requires a Google Maps API key to function. Please set your API key as the{' '}
-        <code className="bg-gray-200 text-red-600 font-mono p-1 rounded">GOOGLE_MAPS_API_KEY</code> environment variable.
+        <code className="bg-gray-200 text-red-600 font-mono p-1 rounded">VITE_GOOGLE_MAPS_API_KEY</code> environment variable.
       </p>
       <p className="text-sm text-gray-500">
         The application will start working automatically once the environment variable is correctly configured. You might need to restart your development server.
@@ -367,29 +428,44 @@ const GoogleMapsApiKeyPrompt: React.FC = () => (
   </div>
 );
 
-// FIX: Define props interface and correctly type the Input component using React.forwardRef
+// Define props interface and correctly type the Input component using React.forwardRef
 // to resolve type errors for props and ref forwarding.
 interface InputProps {
   label: string;
   name: string;
   value?: string | number;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   type?: string;
   required?: boolean;
   placeholder?: string;
   disabled?: boolean;
+  as?: 'input' | 'textarea' | 'select';
+  children?: React.ReactNode;
 }
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, name, value, onChange, type = "text", required = true, placeholder = '', disabled = false }, ref) => (
-  <div>
-    <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
-    <input
-      ref={ref}
-      type={type} id={name} name={name} value={value} onChange={onChange} required={required} placeholder={placeholder} disabled={disabled}
-      className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${disabled ? 'bg-gray-100' : ''}`}
-    />
-  </div>
-));
+const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement, InputProps>(
+    ({ label, name, as = 'input', children, ...props }, ref) => {
+    
+    const commonClasses = `mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${props.disabled ? 'bg-gray-100' : ''}`;
+
+    const renderInput = () => {
+        switch (as) {
+            case 'textarea':
+                return <textarea ref={ref} id={name} name={name} {...props} className={commonClasses + ' h-24'} />;
+            case 'select':
+                 return <select ref={ref} id={name} name={name} {...props} className={commonClasses}>{children}</select>;
+            default:
+                return <input ref={ref} id={name} name={name} {...props} className={commonClasses} />;
+        }
+    };
+
+    return (
+      <div>
+        <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+        {renderInput()}
+      </div>
+    );
+});
 Input.displayName = 'Input';
 
 
@@ -406,6 +482,65 @@ const ProgressBar = ({ currentStep, totalSteps }) => (
     </div>
 );
 
+const FileUploadComponent: React.FC<{ title: string, description: string }> = ({ title, description }) => {
+    const [files, setFiles] = useState<{name: string, size: string, progress: number}[]>([]);
+    
+    const handleAddFiles = () => {
+        const newFiles = [
+            { name: 'Veterinary_License.pdf', size: '1.2 MB', progress: 0 },
+            { name: 'Degree_Certificate.pdf', size: '2.5 MB', progress: 0 }
+        ];
+        setFiles(prev => [...prev, ...newFiles.filter(nf => !prev.some(f => f.name === nf.name))]);
+        
+        newFiles.forEach(file => {
+            const interval = setInterval(() => {
+                setFiles(currentFiles => 
+                    currentFiles.map(f => {
+                        if (f.name === file.name && f.progress < 100) {
+                            const newProgress = f.progress + 10;
+                            if (newProgress >= 100) clearInterval(interval);
+                            return { ...f, progress: Math.min(100, newProgress) };
+                        }
+                        return f;
+                    })
+                );
+            }, 200);
+        });
+    };
+
+    return (
+        <div>
+            <h3 className="text-lg font-semibold">{title}</h3>
+            <p className="text-gray-600">{description}</p>
+            <div className="mt-4 p-6 border-2 border-dashed rounded-md text-center">
+                {files.length === 0 ? (
+                    <>
+                        <p className="text-gray-500">Click button to select files.</p>
+                        <button type="button" onClick={handleAddFiles} className="mt-2 px-4 py-2 bg-gray-200 rounded-md text-sm font-medium hover:bg-gray-300">
+                            Select Files (Mock)
+                        </button>
+                    </>
+                ) : (
+                    <div className="space-y-3 text-left">
+                        {files.map((file, index) => (
+                            <div key={index}>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-gray-700 truncate">{file.name}</span>
+                                    <span className="text-gray-500">{file.size}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
+                                    <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-200" style={{width: `${file.progress}%`}}></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
 const VeterinarianOnboardingForm = ({ user, onComplete }) => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -417,7 +552,7 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMapsScriptLoaded, setIsMapsScriptLoaded] = useState(!!window.google);
     
-    const googleApiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
     useEffect(() => {
         if (!googleApiKey || window.google?.maps) {
@@ -596,14 +731,10 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
                     </>
                 )}
                  {step === 3 && (
-                    <>
-                        <h3 className="text-lg font-semibold">Document Upload</h3>
-                        <p className="text-gray-600">Please upload your veterinary license and degree certificates.</p>
-                        <div className="mt-4 p-6 border-2 border-dashed rounded-md text-center">
-                            <p className="text-gray-500">[Mock File Upload Component]</p>
-                            <button type="button" className="mt-2 px-4 py-2 bg-gray-200 rounded-md text-sm font-medium">Select Files</button>
-                        </div>
-                    </>
+                     <FileUploadComponent 
+                        title="Document Upload"
+                        description="Please upload your veterinary license and degree certificates."
+                     />
                 )}
             </div>
             <div className="mt-8 flex justify-between">
@@ -663,14 +794,10 @@ const VendorOnboardingForm = ({ user, onComplete }) => {
                     </>
                 )}
                  {step === 3 && (
-                     <>
-                        <h3 className="text-lg font-semibold">Document Upload</h3>
-                        <p className="text-gray-600">Please upload your business license and GST certificate.</p>
-                        <div className="mt-4 p-6 border-2 border-dashed rounded-md text-center">
-                            <p className="text-gray-500">[Mock File Upload Component]</p>
-                            <button type="button" className="mt-2 px-4 py-2 bg-gray-200 rounded-md text-sm font-medium">Select Files</button>
-                        </div>
-                    </>
+                     <FileUploadComponent
+                        title="Document Upload"
+                        description="Please upload your business license and GST certificate."
+                     />
                 )}
             </div>
             <div className="mt-8 flex justify-between">
@@ -708,6 +835,320 @@ const OnboardingFlow: React.FC = () => {
         </div>
     );
 }
+
+// --- NEW PROFESSIONAL PAGES ---
+const MyProfileVet: React.FC = () => {
+    const { user, setUser } = useAuth();
+    const [formData, setFormData] = useState<Partial<VeterinarianProfile>>(user?.veterinarian_profile || {});
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        setSaveSuccess(false);
+        try {
+            const updatedUser = await ApiService.updateVeterinarianProfile(user.auth_user_id, formData);
+            setUser(updatedUser);
+            localStorage.setItem('dumble_user', JSON.stringify(updatedUser));
+            setSaveSuccess(true);
+        } catch (error) {
+            console.error("Failed to update profile", error);
+        } finally {
+            setIsSaving(false);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        }
+    };
+
+    return (
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-6">My Profile</h1>
+            <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md space-y-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input label="Full Name" name="full_name" value={formData.full_name} onChange={handleChange} />
+                    <Input label="License Number" name="license_number" value={formData.license_number} onChange={handleChange} />
+                    <Input label="Years of Experience" name="experience_years" type="number" value={formData.experience_years} onChange={handleChange} />
+                    <Input label="Consultation Fee (INR)" name="consultation_fee" type="number" value={formData.consultation_fee} onChange={handleChange} />
+                 </div>
+                 <Input as="textarea" label="Bio" name="bio" value={formData.bio} onChange={handleChange} placeholder="Tell patients about yourself..."/>
+                 <div>
+                    <button type="submit" disabled={isSaving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400">
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    {saveSuccess && <span className="ml-4 text-green-600">Profile updated successfully!</span>}
+                </div>
+            </form>
+        </div>
+    );
+};
+
+const MyProfileVendor: React.FC = () => {
+     const { user, setUser } = useAuth();
+    const [formData, setFormData] = useState<Partial<VendorProfile>>(user?.vendor_profile || {});
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+    
+     const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        setSaveSuccess(false);
+        try {
+            const updatedUser = await ApiService.updateVendorProfile(user.auth_user_id, formData);
+            setUser(updatedUser);
+            localStorage.setItem('dumble_user', JSON.stringify(updatedUser));
+            setSaveSuccess(true);
+        } catch (error) {
+            console.error("Failed to update profile", error);
+        } finally {
+            setIsSaving(false);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        }
+    };
+    
+    return (
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-6">Business Profile</h1>
+            <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} />
+                    <Input label="Business Phone" name="business_phone" value={formData.business_phone} onChange={handleChange} />
+                    <Input label="License Number" name="license_number" value={formData.license_number} onChange={handleChange} />
+                    <Input label="GST Number" name="gst_number" value={formData.gst_number} onChange={handleChange} required={false}/>
+                </div>
+                <Input label="Business Address" name="business_address" value={formData.business_address} onChange={handleChange} />
+                <Input as="textarea" label="Description" name="description" value={formData.description} onChange={handleChange} placeholder="Describe your business..."/>
+                 <div>
+                    <button type="submit" disabled={isSaving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400">
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    {saveSuccess && <span className="ml-4 text-green-600">Profile updated successfully!</span>}
+                </div>
+            </form>
+        </div>
+    );
+};
+
+const Availability: React.FC = () => {
+    const { user, setUser } = useAuth();
+    const [hours, setHours] = useState(user?.veterinarian_profile?.clinics?.[0]?.working_hours || {});
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    const handleTimeChange = (day, field, value) => {
+        setHours(prev => ({
+            ...prev,
+            [day]: { ...prev[day], [field]: value }
+        }));
+    };
+
+    const handleClosedToggle = (day) => {
+        setHours(prev => ({
+            ...prev,
+            [day]: { ...prev[day], closed: !prev[day]?.closed }
+        }));
+    };
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user.veterinarian_profile) return;
+        setIsSaving(true);
+        setSaveSuccess(false);
+
+        const updatedClinics = [...user.veterinarian_profile.clinics];
+        updatedClinics[0] = { ...updatedClinics[0], working_hours: hours };
+
+        try {
+            const updatedUser = await ApiService.updateVeterinarianProfile(user.auth_user_id, { clinics: updatedClinics });
+            setUser(updatedUser);
+            localStorage.setItem('dumble_user', JSON.stringify(updatedUser));
+            setSaveSuccess(true);
+        } catch (error) {
+            console.error("Failed to update availability", error);
+        } finally {
+            setIsSaving(false);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        }
+    };
+
+    return (
+         <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-6">Manage Availability</h1>
+            <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md">
+                <p className="mb-6 text-gray-600">Set your working hours for your primary clinic. This will be visible to pet parents searching for appointments.</p>
+                <div className="space-y-4">
+                    {days.map(day => (
+                        <div key={day} className="grid grid-cols-3 md:grid-cols-4 gap-4 items-center">
+                            <span className="font-medium capitalize text-gray-700">{day}</span>
+                            <div className="col-span-2 flex items-center gap-2">
+                                <Input label="" name={`${day}-start`} type="time" value={hours[day]?.start || ''} onChange={e => handleTimeChange(day, 'start', e.target.value)} disabled={hours[day]?.closed} />
+                                <span>to</span>
+                                <Input label="" name={`${day}-end`} type="time" value={hours[day]?.end || ''} onChange={e => handleTimeChange(day, 'end', e.target.value)} disabled={hours[day]?.closed} />
+                            </div>
+                            <div className="flex items-center">
+                                <input type="checkbox" id={`${day}-closed`} checked={hours[day]?.closed || false} onChange={() => handleClosedToggle(day)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <label htmlFor={`${day}-closed`} className="ml-2 text-sm text-gray-600">Closed</label>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                 <div className="mt-8">
+                    <button type="submit" disabled={isSaving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400">
+                        {isSaving ? 'Saving...' : 'Save Availability'}
+                    </button>
+                    {saveSuccess && <span className="ml-4 text-green-600">Availability updated!</span>}
+                </div>
+            </form>
+        </div>
+    );
+};
+
+const ProductFormModal: React.FC<{
+    product: Product | null;
+    onClose: () => void;
+    onSave: (product: Product) => void;
+    vendorId: string;
+}> = ({ product, onClose, onSave, vendorId }) => {
+    const [formData, setFormData] = useState<Product>(
+        product || {
+            id: '', vendor_id: vendorId, name: '', description: '',
+            category: ProductCategory.Food, price: 0, stock_quantity: 0,
+            images: [], prescription_required: false, status: 'pending'
+        }
+    );
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        const isCheckbox = type === 'checkbox';
+        setFormData(prev => ({
+            ...prev,
+            [name]: isCheckbox ? (e.target as HTMLInputElement).checked : value
+        }));
+    };
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+    
+    return (
+        <Modal isOpen={!!product} onClose={onClose} title={product?.id ? 'Edit Product' : 'Add New Product'}>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <Input label="Product Name" name="name" value={formData.name} onChange={handleChange} />
+                 <Input as="textarea" label="Description" name="description" value={formData.description} onChange={handleChange} />
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input as="select" label="Category" name="category" value={formData.category} onChange={handleChange}>
+                       {Object.values(ProductCategory).map(cat => <option key={cat} value={cat}>{cat.replace('_', ' ')}</option>)}
+                    </Input>
+                    <Input label="Brand" name="brand" value={formData.brand} onChange={handleChange} required={false} />
+                    <Input label="Price (INR)" name="price" type="number" value={formData.price} onChange={handleChange} />
+                    <Input label="Stock Quantity" name="stock_quantity" type="number" value={formData.stock_quantity} onChange={handleChange} />
+                 </div>
+                 <div className="flex items-center">
+                    <input type="checkbox" id="prescription_required" name="prescription_required" checked={formData.prescription_required} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <label htmlFor="prescription_required" className="ml-2 text-sm font-medium text-gray-700">Prescription Required?</label>
+                </div>
+                 <div className="pt-4 flex justify-end space-x-2">
+                     <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Cancel</button>
+                     <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Save Product</button>
+                 </div>
+            </form>
+        </Modal>
+    );
+};
+
+const Products: React.FC = () => {
+    const { user } = useAuth();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    
+    const fetchProducts = () => {
+        setIsLoading(true);
+        ApiService.getProductsByVendor(user.auth_user_id).then(data => {
+            setProducts(data);
+            setIsLoading(false);
+        });
+    };
+    
+    useEffect(fetchProducts, [user.auth_user_id]);
+
+    const handleSave = async (product: Product) => {
+        await ApiService.saveProduct(product);
+        setSelectedProduct(null);
+        fetchProducts();
+    };
+    
+    const handleDelete = async (productId: string) => {
+        if (window.confirm("Are you sure you want to delete this product?")) {
+            await ApiService.deleteProduct(productId);
+            fetchProducts();
+        }
+    };
+
+    const handleAdd = () => {
+        setSelectedProduct({} as Product); // Open modal with empty product
+    };
+
+    if (isLoading) return <Spinner />;
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
+                <button onClick={handleAdd} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Add Product</button>
+            </div>
+             <div className="bg-white shadow rounded-lg overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {products.length === 0 ? (
+                            <tr><td colSpan={6} className="text-center py-8 text-gray-500">You haven't added any products yet.</td></tr>
+                        ) : products.map(p => (
+                            <tr key={p.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{p.category.replace('_', ' ')}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{p.price}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.stock_quantity}</td>
+                                <td className="px-6 py-4 whitespace-nowrap"><Badge status={p.status} /></td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
+                                    <button onClick={() => setSelectedProduct(p)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                                    <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {selectedProduct && (
+                 <ProductFormModal 
+                    product={selectedProduct.id ? selectedProduct : null}
+                    onClose={() => setSelectedProduct(null)}
+                    onSave={handleSave}
+                    vendorId={user.auth_user_id}
+                />
+            )}
+        </div>
+    );
+};
 
 // --- MAIN APP COMPONENT ---
 
