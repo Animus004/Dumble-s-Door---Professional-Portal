@@ -15,6 +15,55 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      // FIX: Add 'appointments' table definition.
+      appointments: {
+        Row: {
+          appointment_date: string
+          auth_user_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          pet_id: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          vet_id: string
+        }
+        Insert: {
+          appointment_date: string
+          auth_user_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pet_id: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          vet_id: string
+        }
+        Update: {
+          appointment_date?: string
+          auth_user_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pet_id?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          vet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_auth_user_id_fkey"
+            columns: ["auth_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_vet_id_fkey"
+            columns: ["vet_id"]
+            isOneToOne: false
+            referencedRelation: "veterinarian_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           clinic_address: string
@@ -380,6 +429,8 @@ export type Database = {
       }
     }
     Enums: {
+      // FIX: Add 'appointment_status' enum definition.
+      appointment_status: "pending" | "confirmed" | "cancelled" | "completed"
       business_type:
         | "pet_shop"
         | "pharmacy"

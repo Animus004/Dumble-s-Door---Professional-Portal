@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, Product, DocumentType, Clinic, ProfileAnalytics, NotificationType, NotificationPreferences, VerificationDocument } from '../types';
+import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, Product, DocumentType, Clinic, ProfileAnalytics, NotificationType, NotificationPreferences, VerificationDocument, AppointmentStatus } from '../types';
 import { TablesInsert, Json } from '../database.types';
 
 // --- AUTH FUNCTIONS ---
@@ -333,6 +333,42 @@ export const saveProduct = async (productData: Product) => {
 
 export const deleteProduct = async (productId: string) => {
     return supabase.from('products').delete().eq('id', productId);
+};
+
+// --- APPOINTMENT MANAGEMENT ---
+
+export const getAppointmentsForVet = async (vetProfileId: string) => {
+    // Note: The 'appointments' table and its columns are assumed based on the user request,
+    // as they are not present in the provided database.types.ts file.
+    // The select query includes a join on user_profiles to fetch the pet parent's email.
+    const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+            id,
+            pet_id,
+            auth_user_id,
+            vet_id,
+            appointment_date,
+            status,
+            notes,
+            user_profiles ( email )
+        `)
+        .eq('vet_id', vetProfileId)
+        .order('appointment_date', { ascending: false });
+        
+    return { data, error };
+};
+    
+export const updateAppointmentStatus = async (appointmentId: string, status: AppointmentStatus) => {
+    // Note: The 'appointments' table is assumed based on the user request.
+    const { error } = await supabase
+        .from('appointments')
+        .update({ status: status })
+        .eq('id', appointmentId);
+        
+    // In a real app, you might create a notification for the pet parent here.
+    
+    return { error };
 };
 
 

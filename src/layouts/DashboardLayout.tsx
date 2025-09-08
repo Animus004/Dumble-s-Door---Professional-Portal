@@ -10,6 +10,7 @@ import MyProfileVet from '../pages/MyProfileVet';
 import MyProfileVendor from '../pages/MyProfileVendor';
 import Availability from '../pages/Availability';
 import Products from '../pages/Products';
+import Appointments from '../pages/Appointments';
 
 const Sidebar: React.FC<{ userRole: UserRole, currentPage: string, setPage: (page: string) => void, isOpen: boolean }> = ({ userRole, currentPage, setPage, isOpen }) => {
     const navItems = SIDENAV_ITEMS[userRole as keyof typeof SIDENAV_ITEMS] || [];
@@ -50,6 +51,9 @@ const DashboardLayout: React.FC = () => {
                  if (user.role === UserRole.Veterinarian) return <MyProfileVet />;
                  if (user.role === UserRole.Vendor) return <MyProfileVendor />;
                  return <p>No profile page available.</p>;
+            case 'appointments':
+                if (user.role === UserRole.Veterinarian) return <Appointments />;
+                return <p>Access Denied</p>;
             case 'availability':
                  if (user.role === UserRole.Veterinarian) return <Availability />;
                  return <p>Access Denied</p>;

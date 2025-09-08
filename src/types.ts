@@ -59,6 +59,14 @@ export enum NotificationType {
     DocumentReminder = 'document_reminder',
 }
 
+export enum AppointmentStatus {
+    Pending = 'pending',
+    Confirmed = 'confirmed',
+    Cancelled = 'cancelled',
+    Completed = 'completed',
+}
+
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -205,6 +213,21 @@ export interface Product {
   // enums for age_group, pet_size
   brand?: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected' | 'out_of_stock';
+}
+
+export interface Appointment {
+  id: string;
+  pet_id: string;
+  auth_user_id: string; // This is the pet parent
+  vet_id: string; // The veterinarian_profile id
+  appointment_date: string;
+  status: AppointmentStatus;
+  notes?: string;
+  
+  // Joined data for display
+  user_profiles?: { email: string };
+  // Mocked for display as we don't have pet info
+  pet_details?: { name: string; breed: string };
 }
 
 // --- ADMIN & ANALYTICS ---
