@@ -1,7 +1,7 @@
 // This file has been repurposed to act as a mock Supabase service.
 // It simulates database and authentication interactions for the frontend.
 
-import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, BusinessType, Product, ProductCategory, DocumentType, VerificationStatus } from '../types';
+import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, BusinessType, Clinic, Product, ProductCategory, VerificationDocument, DocumentType, VerificationStatus } from '../types';
 
 // --- MOCK DATABASE ---
 

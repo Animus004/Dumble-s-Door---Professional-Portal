@@ -1,0 +1,144 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { UserProfile, UserRole, ProfessionalStatus } from '../types';
+import * as ApiService from '../services/geminiService';
+import Badge from '../components/Badge';
+import Skeleton from '../components/Skeleton';
+import VerificationDetails from './VerificationDetails';
+import Input from '../components/Input';
+
+const VerificationQueueSkeleton: React.FC = () => (
+    <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                            <Skeleton className="h-4 w-32 mb-2" />
+                            <Skeleton className="h-3 w-40" />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-24" /></td>
+                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-4 w-20" /></td>
+                        <td className="px-6 py-4 whitespace-nowrap"><Skeleton className="h-6 w-24 rounded-full" /></td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-16" /></td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+);
+
+
+const VerificationQueue: React.FC = () => {
+    const [profiles, setProfiles] = useState<UserProfile[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+
+    useEffect(() => {
+        ApiService.getPendingVerifications().then(data => {
+            setProfiles(data);
+            setIsLoading(false);
+        });
+    }, []);
+    
+    const filteredProfiles = useMemo(() => {
+        return profiles.filter(p => {
+            const name = p.veterinarian_profile?.full_name || p.vendor_profile?.business_name || '';
+            const email = p.email;
+            const searchMatch = name.toLowerCase().includes(searchTerm.toLowerCase()) || email.toLowerCase().includes(searchTerm.toLowerCase());
+            const roleMatch = roleFilter === 'all' || p.role === roleFilter;
+            return searchMatch && roleMatch;
+        });
+    }, [profiles, searchTerm, roleFilter]);
+
+    const handleStatusUpdate = async (userId: string, status: ProfessionalStatus) => {
+        await ApiService.updateProfileStatus(userId, status, "Admin action");
+        setSelectedProfile(null);
+        // Refetch
+        setIsLoading(true);
+        ApiService.getPendingVerifications().then(data => {
+            setProfiles(data);
+            setIsLoading(false);
+        });
+    };
+
+    if (selectedProfile) return <VerificationDetails profile={selectedProfile} onBack={() => setSelectedProfile(null)} onStatusUpdate={handleStatusUpdate} />;
+
+    return (
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Verification Queue</h1>
+            
+            <div className="mb-4 flex flex-col sm:flex-row gap-4">
+                <div className="flex-grow">
+                  <Input 
+                      label=""
+                      name="search"
+                      type="text"
+                      placeholder="Search by name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="w-full sm:w-48">
+                    <Input
+                        as="select"
+                        label=""
+                        name="roleFilter"
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
+                    >
+                        <option value="all">All Roles</option>
+                        <option value={UserRole.Veterinarian}>Veterinarians</option>
+                        <option value={UserRole.Vendor}>Vendors</option>
+                    </Input>
+                </div>
+            </div>
+
+            {isLoading ? <VerificationQueueSkeleton /> : (
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {filteredProfiles.length === 0 ? (
+                                <tr><td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">No matching pending verifications.</td></tr>
+                            ) : filteredProfiles.map(p => (
+                                <tr key={p.auth_user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-200">{p.veterinarian_profile?.full_name || p.vendor_profile?.business_name}</div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">{p.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{p.role.replace('_', ' ')}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{new Date(p.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><Badge status={p.professional_status} /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => setSelectedProfile(p)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">Review</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default VerificationQueue;
