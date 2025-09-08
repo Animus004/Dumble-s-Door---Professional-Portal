@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = ApiService.onAuthStateChange(async (_event, session) => {
       setSession(session);
       await fetchUserProfile(session);
-      if (isLoading) setIsLoading(false);
+      setIsLoading(false);
     });
     
     // Check initial session
@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [fetchUserProfile, isLoading]);
+  }, [fetchUserProfile]);
 
   const signIn: AuthContextType['signIn'] = async (email, pass) => {
     return ApiService.signIn(email, pass);
