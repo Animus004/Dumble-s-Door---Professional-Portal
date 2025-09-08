@@ -37,7 +37,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Attempt to load user from localStorage first for faster UI response
+    setIsLoading(true);
+    // Attempt to load user from localStorage first for faster UI response,
+    // while the real session check happens via the listener.
     const storedUser = localStorage.getItem('dumble_user');
     if (storedUser) {
       try {
@@ -47,23 +49,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const { data: authListener } = ApiService.onAuthStateChange(async (_event, session) => {
+    // The onAuthStateChange listener is the single source of truth.
+    // It fires immediately with the current session state and listens for changes.
+    const { data: { subscription } } = ApiService.onAuthStateChange(async (_event, session) => {
       setSession(session);
       await fetchUserProfile(session);
       setIsLoading(false);
     });
-    
-    // Check initial session
-    ApiService.getSession().then(async ({ data }) => {
-      if (data.session) {
-        setSession(data.session);
-        await fetchUserProfile(data.session);
-      }
-      setIsLoading(false);
-    });
-    
+
     return () => {
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, [fetchUserProfile]);
 
