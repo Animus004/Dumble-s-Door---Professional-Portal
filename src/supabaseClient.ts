@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase URL and Anon Key must be provided in environment variables.");
-}
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// The check for these variables is now moved to the App component
+// to show a graceful error screen instead of a white page crash.
+// We pass empty strings if the env vars are not set, which prevents
+// the client from throwing an error on initialization. Subsequent API calls will fail,
+// but the app UI will at least explain why.
+export const supabase = createClient<Database>(supabaseUrl || '', supabaseAnonKey || '');
