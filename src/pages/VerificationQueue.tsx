@@ -50,8 +50,6 @@ const VerificationQueue: React.FC = () => {
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const { addToast } = useToast();
-    // FIX: Add a ref to manage the `indeterminate` property of the 'select all' checkbox,
-    // which resolves the TypeScript error as `indeterminate` is not a standard React prop.
     const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
 
     const fetchVerifications = useCallback(async () => {
@@ -69,7 +67,6 @@ const VerificationQueue: React.FC = () => {
         fetchVerifications();
     }, [fetchVerifications]);
 
-    // FIX: Hoisted filteredProfiles declaration before its use in the useEffect hook below to resolve a "used before declaration" error.
     const filteredProfiles = useMemo(() => {
         return profiles.filter(p => {
             const name = p.veterinarian_profile?.full_name || p.vendor_profile?.business_name || '';
@@ -80,9 +77,6 @@ const VerificationQueue: React.FC = () => {
         });
     }, [profiles, searchTerm, roleFilter]);
 
-    // FIX: Use a `useEffect` hook to imperatively set the `indeterminate` state
-    // on the checkbox element via its ref. This is the correct React pattern for
-    // handling DOM properties that don't have a corresponding attribute.
     useEffect(() => {
         if (selectAllCheckboxRef.current) {
             const isIndeterminate = selectedIds.size > 0 && selectedIds.size < filteredProfiles.length;

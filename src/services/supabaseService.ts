@@ -1,10 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, Product, DocumentType, Clinic, ProfileAnalytics, Notification, NotificationType, NotificationPreferences } from '../types';
-import { TablesInsert } from '../database.types';
-import { notificationEmitter } from './notificationEmitter';
-
-// --- MOCK NOTIFICATIONS ---
-const MOCK_NOTIFICATIONS: Notification[] = [];
+import { TablesInsert, Json } from '../database.types';
 
 // --- AUTH FUNCTIONS ---
 
@@ -66,8 +62,10 @@ export const getCurrentUserProfile = async (userId: string): Promise<UserProfile
         professional_status: data.professional_status as ProfessionalStatus,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        subscription_status: (data as any).subscription_status || 'free',
-        notification_preferences: (data as any).notification_preferences || { // Add default
+        // FIX: Cast subscription_status to the expected union type to resolve type mismatch.
+        subscription_status: (data.subscription_status || 'free') as 'free' | 'premium',
+        // FIX: Use 'unknown' as an intermediate type for casting from 'Json' to 'NotificationPreferences' to satisfy TypeScript's type safety checks.
+        notification_preferences: (data.notification_preferences as unknown as NotificationPreferences) || { // Add default
              in_app: { status_changes: true, new_applicants: true },
              email: { status_changes: true, new_applicants: true }
         },
@@ -130,7 +128,7 @@ export const updateProfileStatus = async (userId: string, status: ProfessionalSt
     }
     if(specificProfileUpdate?.error) return { error: specificProfileUpdate.error };
     
-    // SIMULATE BACKEND TRIGGER: Create a notification for the user
+    // Create a notification for the user. This will be picked up by the real-time listener.
     let message = '';
     let type: NotificationType;
     if (status === ProfessionalStatus.Approved) {
@@ -149,7 +147,7 @@ export const updateProfileStatus = async (userId: string, status: ProfessionalSt
 };
 
 // --- MOCK FUNCTIONS FOR ADMIN DASHBOARD - in a real app, these would be RPC calls or complex queries. ---
-
+// TODO: Replace these mock implementations with Supabase RPC calls for production.
 export const getDashboardAnalytics = async () => {
     await new Promise(res => setTimeout(res, 800));
     const { data: pending } = await getPendingVerifications();
@@ -173,6 +171,7 @@ export const getDashboardAnalytics = async () => {
 
 export const getAuditTrail = async () => {
     await new Promise(res => setTimeout(res, 500));
+    // TODO: Replace with a query to a real 'audit_log' table
     const mockAuditLog = [
         { id: '1', admin_email: 'admin@dumblesdoor.com', action: 'Approved', target_user_email: 'vendor@example.com', timestamp: new Date(Date.now() - 3600000).toISOString() },
         { id: '2', admin_email: 'admin@dumblesdoor.com', action: 'Rejected', target_user_email: 'test@test.com', timestamp: new Date(Date.now() - 7200000).toISOString() },
@@ -192,6 +191,7 @@ export const batchUpdateProfileStatus = async (userIds: string[], status: Profes
 
 export const exportApprovedUsers = async () => {
     console.log("Generating CSV for approved users...");
+    // TODO: This should be a server-side function that queries the database and returns a CSV file.
     await new Promise(res => setTimeout(res, 1500));
     const headers = "email,role,business_name,full_name,license_number,status\n";
     const rows = [
@@ -216,6 +216,7 @@ export const exportApprovedUsers = async () => {
 
 // --- ONBOARDING & PROFILE MANAGEMENT ---
 
+// TODO: Replace with a Supabase RPC call for production.
 export const getProfileAnalytics = async (): Promise<{ data: ProfileAnalytics | null, error: any }> => {
     await new Promise(res => setTimeout(res, 700));
     const mockData: ProfileAnalytics = {
@@ -334,6 +335,8 @@ export const uploadDocument = async (
             upsert: false,
         });
 
+    // Mock progress since Supabase JS client v2 doesn't support upload progress yet.
+    // In a real app, you might use a server-side endpoint with tus-js-client for this.
     let progress = 0;
     const interval = setInterval(() => {
         progress += 10;
@@ -344,7 +347,7 @@ export const uploadDocument = async (
     if (uploadError) {
         console.error('Upload Error:', uploadError);
         clearInterval(interval);
-        onProgress(100);
+        onProgress(100); // Mark as complete even on error
         return { publicUrl: null, error: uploadError };
     }
 
@@ -357,50 +360,43 @@ export const uploadDocument = async (
 
 // --- NOTIFICATION SYSTEM ---
 
-export const createNotification = async (details: { userId: string, message: string, type: NotificationType, link?: string }): Promise<Notification | null> => {
-    const newNotification: Notification = {
-        id: `notif-${Date.now()}`,
+export const createNotification = async (details: { userId: string, message: string, type: NotificationType, link?: string }) => {
+    return supabase.from('notifications').insert({
         user_id: details.userId,
         message: details.message,
         type: details.type,
-        link: details.link,
-        created_at: new Date().toISOString(),
-        is_read: false,
-    };
-    // In a real app, this would be an insert to the 'notifications' table.
-    MOCK_NOTIFICATIONS.unshift(newNotification);
-    
-    // Emit event to notify the frontend in real-time
-    notificationEmitter.emit(newNotification);
-
-    return newNotification;
+        link: details.link
+    });
 };
 
 export const getNotificationsForUser = async (userId: string) => {
-    await new Promise(res => setTimeout(res, 500));
-    return { data: MOCK_NOTIFICATIONS.filter(n => n.user_id === userId), error: null };
+    return supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 }
 
 export const markNotificationAsRead = async (notificationId: string) => {
-    await new Promise(res => setTimeout(res, 200));
-    const notification = MOCK_NOTIFICATIONS.find(n => n.id === notificationId);
-    if (notification) notification.is_read = true;
-    return { error: null };
+    return supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
 }
 
 export const markAllNotificationsAsRead = async (userId: string) => {
-    await new Promise(res => setTimeout(res, 300));
-    MOCK_NOTIFICATIONS.forEach(n => {
-        if (n.user_id === userId) n.is_read = true;
-    });
-    return { error: null };
+     return supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
 }
 
 export const updateNotificationPreferences = async (userId: string, preferences: NotificationPreferences) => {
     const { error } = await supabase
         .from('user_profiles')
-        // FIX: Remove 'as any' cast now that database types are updated.
-        .update({ notification_preferences: preferences })
+        // FIX: Cast 'NotificationPreferences' to 'Json' via 'unknown' to match the expected type for the Supabase update operation.
+        .update({ notification_preferences: preferences as unknown as Json })
         .eq('id', userId);
         
     if (error) return { updatedProfile: null, error };

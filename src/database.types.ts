@@ -59,6 +59,44 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -120,11 +158,9 @@ export type Database = {
           created_at: string
           email: string
           id: string
-          // FIX: Add missing properties to align with application logic.
           notification_preferences: Json | null
           professional_status: Database["public"]["Enums"]["professional_status"]
           role: Database["public"]["Enums"]["user_role"]
-          // FIX: Add missing properties to align with application logic.
           subscription_status: string | null
           updated_at: string
         }
@@ -132,11 +168,9 @@ export type Database = {
           created_at?: string
           email: string
           id: string
-          // FIX: Add missing properties to align with application logic.
           notification_preferences?: Json | null
           professional_status?: Database["public"]["Enums"]["professional_status"]
           role?: Database["public"]["Enums"]["user_role"]
-          // FIX: Add missing properties to align with application logic.
           subscription_status?: string | null
           updated_at?: string
         }
@@ -144,11 +178,9 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
-          // FIX: Add missing properties to align with application logic.
           notification_preferences?: Json | null
           professional_status?: Database["public"]["Enums"]["professional_status"]
           role?: Database["public"]["Enums"]["user_role"]
-          // FIX: Add missing properties to align with application logic.
           subscription_status?: string | null
           updated_at?: string
         }
@@ -363,6 +395,11 @@ export type Database = {
         | "gst_certificate"
         | "business_license"
         | "pharmacy_license"
+      notification_type:
+        | "status_approved"
+        | "status_rejected"
+        | "new_applicant"
+        | "document_reminder"
       product_category:
         | "food"
         | "medicine"

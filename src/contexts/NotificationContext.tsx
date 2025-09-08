@@ -3,7 +3,7 @@ import { Notification } from '../types';
 import * as ApiService from '../services/supabaseService';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import { notificationEmitter } from '../services/notificationEmitter';
+import { supabase } from '../supabaseClient';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -30,7 +30,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (error) {
       addToast('Failed to load notifications', 'error');
     } else if (data) {
-      setNotifications(data);
+      setNotifications(data as Notification[]);
     }
     setIsLoading(false);
   }, [user, addToast]);
@@ -42,19 +42,27 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     if (!user) return;
 
-    // Listen for real-time notifications
-    const handleNewNotification = (newNotification: Notification) => {
-        // Only process if the notification is for the current user
-        if (newNotification.user_id === user.auth_user_id) {
-            setNotifications(prev => [newNotification, ...prev]);
-            addToast("You have a new notification!", 'success');
+    // Listen for real-time notifications via Supabase Realtime
+    const channel = supabase
+      .channel(`public:notifications:user_id=eq.${user.auth_user_id}`)
+      .on<Notification>(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${user.auth_user_id}`
+        },
+        (payload) => {
+          const newNotification = payload.new;
+          setNotifications(prev => [newNotification, ...prev]);
+          addToast("You have a new notification!", 'success');
         }
-    };
-
-    const unsubscribe = notificationEmitter.subscribe(handleNewNotification);
+      )
+      .subscribe();
 
     return () => {
-      unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [user, addToast]);
 
@@ -67,9 +75,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const markAllAsRead = async () => {
-    if (unreadCount > 0) {
+    if (unreadCount > 0 && user) {
         setNotifications(prev => prev.map(n => ({...n, is_read: true})));
-        await ApiService.markAllNotificationsAsRead(user!.auth_user_id);
+        await ApiService.markAllNotificationsAsRead(user.auth_user_id);
     }
   };
 

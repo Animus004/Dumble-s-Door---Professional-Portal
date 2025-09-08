@@ -109,7 +109,6 @@ const ProfessionalDashboard: React.FC = () => {
     
     return (
         <div>
-            {/* FIX: Correctly access profile name from user object to avoid type errors on the profile union type. */}
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Welcome, {user.veterinarian_profile?.full_name || user.vendor_profile?.business_name}!</h1>
             
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
