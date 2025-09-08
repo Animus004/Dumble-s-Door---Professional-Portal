@@ -90,9 +90,9 @@ export const getPendingVerifications = async () => {
         created_at,
         updated_at,
         notification_preferences,
-        veterinarian_profile:veterinarian_profiles(*),
+        veterinarian_profile:veterinarian_profiles(*, clinics(*)),
         vendor_profile:vendor_profiles(*),
-        verification_documents(*)
+        verification_documents!user_id(*)
       `)
       .eq('professional_status', ProfessionalStatus.Pending);
 
@@ -120,7 +120,7 @@ export const getPendingVerifications = async () => {
             subscription_status: 'free', // Default value, assuming not selected in this query
         }));
      
-    return { data: userProfiles, error };
+    return { data: userProfiles, error: null };
 };
 
 export const updateProfileStatus = async (userId: string, status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => {
@@ -197,11 +197,14 @@ export const getAuditTrail = async () => {
 }
 
 export const batchUpdateProfileStatus = async (userIds: string[], status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => {
-    console.log(`Batch updating users ${userIds.join(', ')} to status ${status} with details:`, rejectionDetails);
-    await new Promise(res => setTimeout(res, 1000));
     for (const userId of userIds) {
-        await updateProfileStatus(userId, status, rejectionDetails);
+        const { error } = await updateProfileStatus(userId, status, rejectionDetails);
+        if (error) {
+            // If an error occurs during one of the updates, stop and return the error.
+            return { error };
+        }
     }
+    // If all updates were successful, return no error.
     return { error: null };
 }
 
