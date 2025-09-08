@@ -12,7 +12,7 @@ import Availability from '../pages/Availability';
 import Products from '../pages/Products';
 
 const Sidebar: React.FC<{ userRole: UserRole, currentPage: string, setPage: (page: string) => void, isOpen: boolean }> = ({ userRole, currentPage, setPage, isOpen }) => {
-    const navItems = SIDENAV_ITEMS[userRole] || [];
+    const navItems = SIDENAV_ITEMS[userRole as keyof typeof SIDENAV_ITEMS] || [];
     return (
         <aside className={`bg-gray-800 text-white w-64 space-y-2 py-4 flex-shrink-0 absolute lg:relative lg:translate-x-0 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} z-40`}>
              <nav>

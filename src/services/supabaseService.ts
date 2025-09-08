@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, Product, DocumentType, Clinic, ProfileAnalytics, Notification, NotificationType, NotificationPreferences } from '../types';
+import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, Product, DocumentType, Clinic, ProfileAnalytics, NotificationType, NotificationPreferences, VerificationDocument } from '../types';
 import { TablesInsert, Json } from '../database.types';
 
 // --- AUTH FUNCTIONS ---
@@ -83,28 +83,44 @@ export const getPendingVerifications = async () => {
     const { data, error } = await supabase
       .from('user_profiles')
       .select(`
-        auth_user_id:id,
+        id,
         email,
         role,
         professional_status,
         created_at,
         updated_at,
+        notification_preferences,
         veterinarian_profile:veterinarian_profiles(*),
         vendor_profile:vendor_profiles(*),
         verification_documents(*)
       `)
       .eq('professional_status', ProfessionalStatus.Pending);
 
-    if (error) console.error("Error fetching pending verifications:", error);
+    if (error) {
+        console.error("Error fetching pending verifications:", error);
+        return { data: [], error };
+    }
     
-    const profilesWithDetails = data?.filter(p => !!p.veterinarian_profile || !!p.vendor_profile)
-     .map(p => ({
-        ...p,
-        veterinarian_profile: p.veterinarian_profile,
-        vendor_profile: p.vendor_profile
-     }));
+    const userProfiles: UserProfile[] = (data || [])
+        .filter(p => !!p.veterinarian_profile || !!p.vendor_profile)
+        .map(p => ({
+            auth_user_id: p.id,
+            email: p.email,
+            role: p.role as UserRole,
+            professional_status: p.professional_status as ProfessionalStatus,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            notification_preferences: (p.notification_preferences as unknown as NotificationPreferences) || {
+                in_app: { status_changes: true, new_applicants: true },
+                email: { status_changes: true, new_applicants: true }
+            },
+            veterinarian_profile: (Array.isArray(p.veterinarian_profile) ? p.veterinarian_profile[0] : p.veterinarian_profile) || undefined,
+            vendor_profile: (Array.isArray(p.vendor_profile) ? p.vendor_profile[0] : p.vendor_profile) || undefined,
+            verification_documents: p.verification_documents as VerificationDocument[],
+            subscription_status: 'free', // Default value, assuming not selected in this query
+        }));
      
-    return { data: profilesWithDetails, error };
+    return { data: userProfiles, error };
 };
 
 export const updateProfileStatus = async (userId: string, status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => {

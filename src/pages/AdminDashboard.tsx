@@ -11,10 +11,10 @@ const StatCard: React.FC<{ title: string; value: string | number; isLoading: boo
     </div>
 );
 
-const TrendChart: React.FC<{ data: DashboardAnalytics['registrationTrends']; isLoading: boolean }> = ({ data, isLoading }) => {
-    if (isLoading) return <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow"><h3 className="font-semibold mb-4">Registration Trends</h3><Skeleton className="h-64 w-full" /></div>;
+const TrendChart: React.FC<{ data?: DashboardAnalytics['registrationTrends']; isLoading: boolean }> = ({ data, isLoading }) => {
+    if (isLoading || !data) return <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow"><h3 className="font-semibold mb-4">Registration Trends</h3><Skeleton className="h-64 w-full" /></div>;
     
-    const maxVal = Math.max(...data.vetData, ...data.vendorData);
+    const maxVal = Math.max(...data.vetData, ...data.vendorData, 1);
 
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow h-full flex flex-col">
@@ -38,15 +38,14 @@ const TrendChart: React.FC<{ data: DashboardAnalytics['registrationTrends']; isL
     );
 };
 
-const DoughnutChart: React.FC<{ data: DashboardAnalytics['approvalStats']; isLoading: boolean }> = ({ data, isLoading }) => {
-    if (isLoading) return <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow"><h3 className="font-semibold mb-4">Approval Stats</h3><div className="flex justify-center items-center"><Skeleton className="h-32 w-32 rounded-full" /></div></div>;
+const DoughnutChart: React.FC<{ data?: DashboardAnalytics['approvalStats']; isLoading: boolean }> = ({ data, isLoading }) => {
+    if (isLoading || !data) return <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow"><h3 className="font-semibold mb-4">Approval Stats</h3><div className="flex justify-center items-center"><Skeleton className="h-32 w-32 rounded-full" /></div></div>;
 
     const total = data.approved + data.pending + data.rejected;
-    const approvedPercent = (data.approved / total) * 100;
-    const pendingPercent = (data.pending / total) * 100;
+    const approvedPercent = total > 0 ? (data.approved / total) * 100 : 0;
+    const pendingPercent = total > 0 ? (data.pending / total) * 100 : 0;
 
     const approvedOffset = 25;
-    const pendingOffset = 25 + (100 - approvedPercent);
     
     return (
          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow h-full flex flex-col">
@@ -104,13 +103,17 @@ const AdminDashboard: React.FC = () => {
                     ApiService.getAuditTrail()
                 ]);
 
-                if (analyticsRes.error) throw new Error(analyticsRes.error.message);
-                if (auditRes.error) throw new Error(auditRes.error.message);
+                if (analyticsRes.error) throw analyticsRes.error;
+                if (auditRes.error) throw auditRes.error;
 
                 setAnalytics(analyticsRes.data);
                 setAuditLog(auditRes.data);
-            } catch (err: any) {
-                addToast(err.message || "Failed to fetch dashboard data.", "error");
+            } catch (err: unknown) {
+                if (err instanceof Error) {
+                    addToast(err.message || "Failed to fetch dashboard data.", "error");
+                } else {
+                    addToast("An unknown error occurred while fetching dashboard data.", "error");
+                }
             } finally {
                 setIsLoading(false);
             }

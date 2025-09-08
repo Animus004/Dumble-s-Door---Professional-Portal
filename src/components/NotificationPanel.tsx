@@ -35,7 +35,7 @@ const NotificationItem: React.FC<{ notification: Notification; onRead: (id: stri
     </li>
 );
 
-const NotificationPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const NotificationPanel: React.FC<{ onClose: () => void; }> = () => {
     const { notifications, isLoading, markAsRead, markAllAsRead, unreadCount } = useNotifications();
 
     return (

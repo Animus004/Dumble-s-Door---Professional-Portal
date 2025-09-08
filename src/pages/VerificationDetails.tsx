@@ -103,7 +103,7 @@ const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, 
 
                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 border-b pb-2 mt-4 dark:border-gray-700">Documents</h3>
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                   {profile.verification_documents?.length > 0 ? (
+                   {profile.verification_documents && profile.verification_documents.length > 0 ? (
                       profile.verification_documents.map(doc => (
                         <button key={doc.id} onClick={() => setPreviewDocUrl(doc.document_url)} className="border dark:border-gray-700 rounded-lg p-3 text-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <p className="font-medium text-blue-600 dark:text-blue-400 capitalize">{doc.document_type.replace('_', ' ')}</p>

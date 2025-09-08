@@ -70,7 +70,7 @@ const SubscriptionWidget: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
 };
 
-const RenewalReminders: React.FC<{ user: UserProfile }> = ({ user }) => {
+const RenewalReminders: React.FC<{}> = () => {
     // Mock data for this example
     const documents: Partial<VerificationDocument>[] = [
         { document_type: DocumentType.License, expires_at: new Date(Date.now() + 2592000000).toISOString() }, // 30 days from now
@@ -121,7 +121,7 @@ const ProfessionalDashboard: React.FC = () => {
                  {profile?.status === ProfessionalStatus.Rejected && <p className="text-red-600 dark:text-red-400 mt-2">Unfortunately, your profile could not be approved at this time. Please check your email for more details.</p>}
             </div>
 
-            <RenewalReminders user={user} />
+            <RenewalReminders />
             <ProfileAnalyticsDashboard />
             <SubscriptionWidget user={user} />
         </div>

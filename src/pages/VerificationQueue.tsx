@@ -58,7 +58,7 @@ const VerificationQueue: React.FC = () => {
         if (error) {
             addToast(error.message, 'error');
         } else if (data) {
-            setProfiles(data as UserProfile[]);
+            setProfiles(data);
         }
         setIsLoading(false);
     }, [addToast]);
@@ -118,10 +118,19 @@ const VerificationQueue: React.FC = () => {
     
     const handleExport = async () => {
         setIsExporting(true);
-        const { error } = await ApiService.exportApprovedUsers();
-        if (error) addToast(error.message, 'error');
-        else addToast('Export started successfully!', 'success');
-        setIsExporting(false);
+        try {
+            const { error } = await ApiService.exportApprovedUsers();
+            if (error) throw error;
+            addToast('Export started successfully!', 'success');
+        } catch (err) {
+            if (err instanceof Error) {
+                addToast(err.message, 'error');
+            } else {
+                addToast('An unknown error occurred during export.', 'error');
+            }
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const handleStatusUpdate = async (userId: string, status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => {
