@@ -2,6 +2,7 @@ import React from 'react';
 import { UserProfile } from '../types';
 import { ICONS } from '../constants';
 import { useTheme } from '../hooks/useTheme';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
   user: UserProfile | null;
@@ -28,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar }) => {
         <h1 className="text-xl font-bold text-gray-800 dark:text-gray-200">Professional Portal</h1>
        </div>
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2 sm:space-x-4">
          <button
             onClick={toggleTheme}
             className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
@@ -36,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar }) => {
           >
             {theme === 'light' ? ICONS.MOON : ICONS.SUN}
           </button>
+        <NotificationBell />
         <div className="relative">
           {user && (
             <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center space-x-2" aria-expanded={menuOpen} aria-haspopup="true">

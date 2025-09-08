@@ -2,11 +2,75 @@ import React, { useState } from 'react';
 import { UserProfile, ProfessionalStatus, Clinic } from '../types';
 import { ICONS } from '../constants';
 import Modal from '../components/Modal';
+import Input from '../components/Input';
 
-const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, onStatusUpdate: (userId: string, status: ProfessionalStatus) => void }> = ({ profile, onBack, onStatusUpdate }) => {
+interface RejectionModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (details: { reason: string, comments: string }) => void;
+}
+
+const RejectionModal: React.FC<RejectionModalProps> = ({ isOpen, onClose, onSubmit }) => {
+    const [reason, setReason] = useState('');
+    const [comments, setComments] = useState('');
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ reason, comments });
+    };
+    
+    const rejectionReasons = [
+        "Incomplete Profile Information",
+        "Document(s) are Unclear or Illegible",
+        "Invalid or Expired License",
+        "Verification Information Mismatch",
+        "Other (Please specify in comments)"
+    ];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Reason for Rejection">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <Input
+                    as="select"
+                    label="Rejection Reason"
+                    name="rejection_reason"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    required
+                >
+                    <option value="" disabled>Select a reason...</option>
+                    {rejectionReasons.map(r => <option key={r} value={r}>{r}</option>)}
+                </Input>
+                
+                <Input
+                    as="textarea"
+                    label="Additional Comments (optional)"
+                    name="comments"
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Provide specific feedback to the applicant..."
+                />
+                
+                <div className="pt-4 flex justify-end space-x-2">
+                     <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+                     <button type="submit" className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Submit Rejection</button>
+                 </div>
+            </form>
+        </Modal>
+    );
+};
+
+
+const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, onStatusUpdate: (userId: string, status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => void }> = ({ profile, onBack, onStatusUpdate }) => {
     const details = profile.veterinarian_profile || profile.vendor_profile;
     const isVet = !!profile.veterinarian_profile;
     const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
+    const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+
+    const handleRejectSubmit = (rejectionDetails: { reason: string, comments: string }) => {
+        onStatusUpdate(profile.auth_user_id, ProfessionalStatus.Rejected, rejectionDetails);
+        setIsRejectionModalOpen(false);
+    }
 
     return (
         <div>
@@ -54,12 +118,13 @@ const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, 
 
             <div className="mt-6 flex space-x-4">
                  <button onClick={() => onStatusUpdate(profile.auth_user_id, ProfessionalStatus.Approved)} className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">Approve</button>
-                 <button onClick={() => onStatusUpdate(profile.auth_user_id, ProfessionalStatus.Rejected)} className="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Reject</button>
+                 <button onClick={() => setIsRejectionModalOpen(true)} className="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Reject</button>
             </div>
             
              <Modal isOpen={!!previewDocUrl} onClose={() => setPreviewDocUrl(null)} title="Document Preview">
                 {previewDocUrl && <img src={previewDocUrl} alt="Document Preview" className="w-full h-auto rounded-md" />}
             </Modal>
+            <RejectionModal isOpen={isRejectionModalOpen} onClose={() => setIsRejectionModalOpen(false)} onSubmit={handleRejectSubmit} />
         </div>
     );
 };

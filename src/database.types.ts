@@ -120,24 +120,36 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          // FIX: Add missing properties to align with application logic.
+          notification_preferences: Json | null
           professional_status: Database["public"]["Enums"]["professional_status"]
           role: Database["public"]["Enums"]["user_role"]
+          // FIX: Add missing properties to align with application logic.
+          subscription_status: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           email: string
           id: string
+          // FIX: Add missing properties to align with application logic.
+          notification_preferences?: Json | null
           professional_status?: Database["public"]["Enums"]["professional_status"]
           role?: Database["public"]["Enums"]["user_role"]
+          // FIX: Add missing properties to align with application logic.
+          subscription_status?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           email?: string
           id?: string
+          // FIX: Add missing properties to align with application logic.
+          notification_preferences?: Json | null
           professional_status?: Database["public"]["Enums"]["professional_status"]
           role?: Database["public"]["Enums"]["user_role"]
+          // FIX: Add missing properties to align with application logic.
+          subscription_status?: string | null
           updated_at?: string
         }
         Relationships: [

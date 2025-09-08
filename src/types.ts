@@ -50,6 +50,58 @@ export enum DocumentType {
     PharmacyLicense = 'pharmacy_license',
 }
 
+// --- NEW INTERFACES for advanced features ---
+
+export enum NotificationType {
+    StatusApproved = 'status_approved',
+    StatusRejected = 'status_rejected',
+    NewApplicant = 'new_applicant', // For admins
+    DocumentReminder = 'document_reminder',
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  created_at: string;
+  message: string;
+  type: NotificationType;
+  is_read: boolean;
+  link?: string;
+}
+
+export interface NotificationPreferences {
+    in_app: {
+        status_changes: boolean;
+        new_applicants: boolean; // For admins
+    };
+    email: {
+        status_changes: boolean;
+        new_applicants: boolean;
+    }
+}
+
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  description: string;
+  before_image_url: string;
+  after_image_url: string;
+}
+
+export interface Testimonial {
+  id: string;
+  author_name: string;
+  text: string;
+  rating: number; // 1-5
+}
+
+export interface ProfileAnalytics {
+  profile_views: { total: number; change: number };
+  appointments_booked: { total: number; change: number };
+  conversion_rate: { value: number; change: number };
+  views_over_time: { labels: string[]; data: number[] };
+}
+
 
 // --- BASE INTERFACES ---
 
@@ -58,6 +110,8 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   professional_status: ProfessionalStatus;
+  subscription_status?: 'free' | 'premium';
+  notification_preferences: NotificationPreferences;
   verification_documents?: VerificationDocument[]; // Simplified for frontend
   created_at: string;
   updated_at: string;
@@ -76,6 +130,7 @@ export interface VerificationDocument {
   verified_at?: string;
   rejection_reason?: string;
   uploaded_at: string;
+  expires_at?: string;
 }
 
 // --- PROFESSIONAL PROFILES ---
@@ -106,6 +161,8 @@ export interface VeterinarianProfile {
   bio: string;
   languages_spoken: string[];
   status: ProfessionalStatus;
+  portfolio?: PortfolioItem[];
+  testimonials?: Testimonial[];
 }
 
 export interface VendorProfile {
@@ -126,6 +183,8 @@ export interface VendorProfile {
   description: string;
   services_offered: string[];
   status: ProfessionalStatus;
+  portfolio?: PortfolioItem[];
+  testimonials?: Testimonial[];
 }
 
 
@@ -146,4 +205,30 @@ export interface Product {
   // enums for age_group, pet_size
   brand?: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected' | 'out_of_stock';
+}
+
+// --- ADMIN & ANALYTICS ---
+
+export interface DashboardAnalytics {
+  pendingVerifications: number;
+  newRegistrations: number;
+  approvalRate: number;
+  registrationTrends: {
+    labels: string[];
+    vetData: number[];
+    vendorData: number[];
+  };
+  approvalStats: {
+    approved: number;
+    pending: number;
+    rejected: number;
+  };
+}
+
+export interface AuditLog {
+  id: string;
+  admin_email: string;
+  action: string;
+  target_user_email: string;
+  timestamp: string;
 }

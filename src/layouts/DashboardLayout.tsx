@@ -43,6 +43,9 @@ const DashboardLayout: React.FC = () => {
             case 'verification':
                  if (user.role === UserRole.Admin) return <VerificationQueue />;
                  return <p>Access Denied</p>
+            case 'users':
+                if (user.role === UserRole.Admin) return <div><h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200">User Management</h1><p className="mt-4 text-gray-600 dark:text-gray-400">This page will contain tools for managing all registered users, including search, filter, and manual account actions. The export functionality is currently available on the Verification page.</p></div>;
+                return <p>Access Denied</p>
             case 'profile':
                  if (user.role === UserRole.Veterinarian) return <MyProfileVet />;
                  if (user.role === UserRole.Vendor) return <MyProfileVendor />;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus } from '../types';
 import * as ApiService from '../services/supabaseService';
 import Badge from '../components/Badge';
@@ -12,6 +12,7 @@ const VerificationQueueSkeleton: React.FC = () => (
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
+                    <th className="px-6 py-3 w-12"><Skeleton className="h-5 w-5 rounded"/></th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
@@ -22,6 +23,7 @@ const VerificationQueueSkeleton: React.FC = () => (
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
+                        <td className="px-6 py-4"><Skeleton className="h-5 w-5 rounded"/></td>
                         <td className="px-6 py-4 whitespace-nowrap">
                             <Skeleton className="h-4 w-32 mb-2" />
                             <Skeleton className="h-3 w-40" />
@@ -44,7 +46,13 @@ const VerificationQueue: React.FC = () => {
     const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const { addToast } = useToast();
+    // FIX: Add a ref to manage the `indeterminate` property of the 'select all' checkbox,
+    // which resolves the TypeScript error as `indeterminate` is not a standard React prop.
+    const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
 
     const fetchVerifications = useCallback(async () => {
         setIsLoading(true);
@@ -60,7 +68,8 @@ const VerificationQueue: React.FC = () => {
     useEffect(() => {
         fetchVerifications();
     }, [fetchVerifications]);
-    
+
+    // FIX: Hoisted filteredProfiles declaration before its use in the useEffect hook below to resolve a "used before declaration" error.
     const filteredProfiles = useMemo(() => {
         return profiles.filter(p => {
             const name = p.veterinarian_profile?.full_name || p.vendor_profile?.business_name || '';
@@ -71,8 +80,58 @@ const VerificationQueue: React.FC = () => {
         });
     }, [profiles, searchTerm, roleFilter]);
 
-    const handleStatusUpdate = async (userId: string, status: ProfessionalStatus) => {
-        const { error } = await ApiService.updateProfileStatus(userId, status, "Admin action");
+    // FIX: Use a `useEffect` hook to imperatively set the `indeterminate` state
+    // on the checkbox element via its ref. This is the correct React pattern for
+    // handling DOM properties that don't have a corresponding attribute.
+    useEffect(() => {
+        if (selectAllCheckboxRef.current) {
+            const isIndeterminate = selectedIds.size > 0 && selectedIds.size < filteredProfiles.length;
+            selectAllCheckboxRef.current.indeterminate = isIndeterminate;
+        }
+    }, [selectedIds, filteredProfiles.length]);
+    
+    const handleSelectOne = (id: string) => {
+        const newSelectedIds = new Set(selectedIds);
+        if (newSelectedIds.has(id)) {
+            newSelectedIds.delete(id);
+        } else {
+            newSelectedIds.add(id);
+        }
+        setSelectedIds(newSelectedIds);
+    };
+    
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedIds(new Set(filteredProfiles.map(p => p.auth_user_id)));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleBatchAction = async (status: ProfessionalStatus) => {
+        if(selectedIds.size === 0) return;
+        setIsProcessingBatch(true);
+        const { error } = await ApiService.batchUpdateProfileStatus(Array.from(selectedIds), status);
+        if (error) {
+            addToast(error.message, 'error');
+        } else {
+            addToast(`${selectedIds.size} profile(s) have been ${status}.`, 'success');
+            setSelectedIds(new Set());
+            fetchVerifications();
+        }
+        setIsProcessingBatch(false);
+    };
+    
+    const handleExport = async () => {
+        setIsExporting(true);
+        const { error } = await ApiService.exportApprovedUsers();
+        if (error) addToast(error.message, 'error');
+        else addToast('Export started successfully!', 'success');
+        setIsExporting(false);
+    };
+
+    const handleStatusUpdate = async (userId: string, status: ProfessionalStatus, rejectionDetails?: { reason: string, comments: string }) => {
+        const { error } = await ApiService.updateProfileStatus(userId, status, rejectionDetails);
         if (error) {
             addToast(error.message, 'error');
         } else {
@@ -86,7 +145,16 @@ const VerificationQueue: React.FC = () => {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Verification Queue</h1>
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Verification Queue</h1>
+                <button 
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-green-400"
+                >
+                    {isExporting ? 'Exporting...' : 'Export Approved'}
+                </button>
+            </div>
             
             <div className="mb-4 flex flex-col sm:flex-row gap-4">
                 <div className="flex-grow">
@@ -114,11 +182,28 @@ const VerificationQueue: React.FC = () => {
                 </div>
             </div>
 
+            {selectedIds.size > 0 && (
+                <div className="bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">{selectedIds.size} item(s) selected.</p>
+                    <div className="space-x-2">
+                        <button onClick={() => handleBatchAction(ProfessionalStatus.Approved)} disabled={isProcessingBatch} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">Approve</button>
+                        <button onClick={() => handleBatchAction(ProfessionalStatus.Rejected)} disabled={isProcessingBatch} className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">Reject</button>
+                    </div>
+                </div>
+            )}
+
             {isLoading ? <VerificationQueueSkeleton /> : (
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
+                                <th className="px-6 py-3 w-12">
+                                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900" 
+                                        ref={selectAllCheckboxRef}
+                                        onChange={handleSelectAll}
+                                        checked={selectedIds.size > 0 && selectedIds.size === filteredProfiles.length}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
@@ -128,9 +213,15 @@ const VerificationQueue: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                             {filteredProfiles.length === 0 ? (
-                                <tr><td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">No matching pending verifications.</td></tr>
+                                <tr><td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No matching pending verifications.</td></tr>
                             ) : filteredProfiles.map(p => (
-                                <tr key={p.auth_user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <tr key={p.auth_user_id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedIds.has(p.auth_user_id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+                                    <td className="px-6 py-4">
+                                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900"
+                                            onChange={() => handleSelectOne(p.auth_user_id)}
+                                            checked={selectedIds.has(p.auth_user_id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-200">{p.veterinarian_profile?.full_name || p.vendor_profile?.business_name}</div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">{p.email}</div>

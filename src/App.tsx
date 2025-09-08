@@ -9,6 +9,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 // Add global declarations to fix TypeScript errors.
 declare global {
@@ -30,9 +31,11 @@ const App: React.FC = () => {
     <AuthProvider>
       <ThemeProvider>
         <ToastProvider>
-          <ErrorBoundary>
-            <MainApp />
-          </ErrorBoundary>
+          <NotificationProvider>
+            <ErrorBoundary>
+              <MainApp />
+            </ErrorBoundary>
+          </NotificationProvider>
         </ToastProvider>
       </ThemeProvider>
     </AuthProvider>
