@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Product } from '../types';
-import * as ApiService from '../services/geminiService';
+import * as ApiService from '../services/supabaseService';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import Badge from '../components/Badge';
@@ -45,30 +45,43 @@ const Products: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     
-    const fetchProducts = () => {
-        if(!user) return;
+    const fetchProducts = useCallback(async () => {
+        if(!user?.vendor_profile) return;
         setIsLoading(true);
-        ApiService.getProductsByVendor(user.auth_user_id).then(data => {
-            setProducts(data);
-            setIsLoading(false);
-        });
-    };
+        const { data, error } = await ApiService.getProductsByVendor(user.vendor_profile.id);
+        if (error) {
+            addToast(error.message, 'error');
+        } else if (data) {
+            setProducts(data as Product[]);
+        }
+        setIsLoading(false);
+    }, [user, addToast]);
     
-    useEffect(fetchProducts, [user]);
+    useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
 
     const handleSave = async (product: Product) => {
-        await ApiService.saveProduct(product);
-        addToast(`Product ${product.id ? 'updated' : 'added'} successfully!`, 'success');
-        setIsModalOpen(false);
-        setSelectedProduct(null);
-        fetchProducts();
+        const { error } = await ApiService.saveProduct(product);
+        if (error) {
+            addToast(error.message, 'error');
+        } else {
+            addToast(`Product ${product.id ? 'updated' : 'added'} successfully!`, 'success');
+            setIsModalOpen(false);
+            setSelectedProduct(null);
+            fetchProducts();
+        }
     };
     
     const handleDelete = async (productId: string) => {
         if (window.confirm("Are you sure you want to delete this product?")) {
-            await ApiService.deleteProduct(productId);
-            addToast('Product deleted successfully.', 'success');
-            fetchProducts();
+            const { error } = await ApiService.deleteProduct(productId);
+            if (error) {
+                addToast(error.message, 'error');
+            } else {
+                addToast('Product deleted successfully.', 'success');
+                fetchProducts();
+            }
         }
     };
 
@@ -82,7 +95,7 @@ const Products: React.FC = () => {
         setIsModalOpen(true);
     }
     
-    if(!user) return null;
+    if(!user?.vendor_profile) return <p>Vendor profile not found.</p>;
 
     return (
         <div>
@@ -129,7 +142,7 @@ const Products: React.FC = () => {
                     product={selectedProduct}
                     onClose={() => setIsModalOpen(false)}
                     onSave={handleSave}
-                    vendorId={user.auth_user_id}
+                    vendorId={user.vendor_profile.id}
                 />
             )}
         </div>

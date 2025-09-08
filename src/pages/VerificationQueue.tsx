@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus } from '../types';
-import * as ApiService from '../services/geminiService';
+import * as ApiService from '../services/supabaseService';
 import Badge from '../components/Badge';
 import Skeleton from '../components/Skeleton';
 import VerificationDetails from './VerificationDetails';
 import Input from '../components/Input';
+import { useToast } from '../hooks/useToast';
 
 const VerificationQueueSkeleton: React.FC = () => (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -43,13 +44,22 @@ const VerificationQueue: React.FC = () => {
     const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+    const { addToast } = useToast();
+
+    const fetchVerifications = useCallback(async () => {
+        setIsLoading(true);
+        const { data, error } = await ApiService.getPendingVerifications();
+        if (error) {
+            addToast(error.message, 'error');
+        } else if (data) {
+            setProfiles(data as UserProfile[]);
+        }
+        setIsLoading(false);
+    }, [addToast]);
 
     useEffect(() => {
-        ApiService.getPendingVerifications().then(data => {
-            setProfiles(data);
-            setIsLoading(false);
-        });
-    }, []);
+        fetchVerifications();
+    }, [fetchVerifications]);
     
     const filteredProfiles = useMemo(() => {
         return profiles.filter(p => {
@@ -62,14 +72,14 @@ const VerificationQueue: React.FC = () => {
     }, [profiles, searchTerm, roleFilter]);
 
     const handleStatusUpdate = async (userId: string, status: ProfessionalStatus) => {
-        await ApiService.updateProfileStatus(userId, status, "Admin action");
-        setSelectedProfile(null);
-        // Refetch
-        setIsLoading(true);
-        ApiService.getPendingVerifications().then(data => {
-            setProfiles(data);
-            setIsLoading(false);
-        });
+        const { error } = await ApiService.updateProfileStatus(userId, status, "Admin action");
+        if (error) {
+            addToast(error.message, 'error');
+        } else {
+            addToast(`Profile has been ${status}.`, 'success');
+            setSelectedProfile(null);
+            fetchVerifications();
+        }
     };
 
     if (selectedProfile) return <VerificationDetails profile={selectedProfile} onBack={() => setSelectedProfile(null)} onStatusUpdate={handleStatusUpdate} />;

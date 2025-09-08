@@ -35,15 +35,15 @@ const ProductFormModal: React.FC<{
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={product?.id ? 'Edit Product' : 'Add New Product'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <Input label="Product Name" name="name" value={formData.name} onChange={handleChange} />
-                 <Input as="textarea" label="Description" name="description" value={formData.description} onChange={handleChange} />
+                <Input label="Product Name" name="name" value={formData.name} onChange={handleChange} required minLength={3}/>
+                 <Input as="textarea" label="Description" name="description" value={formData.description} onChange={handleChange} required minLength={10}/>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input as="select" label="Category" name="category" value={formData.category} onChange={handleChange}>
                        {Object.values(ProductCategory).map(cat => <option key={cat} value={cat}>{cat.replace('_', ' ')}</option>)}
                     </Input>
                     <Input label="Brand" name="brand" value={formData.brand || ''} onChange={handleChange} required={false} />
-                    <Input label="Price (INR)" name="price" type="number" value={formData.price} onChange={handleChange} />
-                    <Input label="Stock Quantity" name="stock_quantity" type="number" value={formData.stock_quantity} onChange={handleChange} />
+                    <Input label="Price (INR)" name="price" type="number" min="0" value={formData.price} onChange={handleChange} required/>
+                    <Input label="Stock Quantity" name="stock_quantity" type="number" min="0" value={formData.stock_quantity} onChange={handleChange} required/>
                  </div>
                  <div className="flex items-center">
                     <input type="checkbox" id="prescription_required" name="prescription_required" checked={formData.prescription_required} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-700" />

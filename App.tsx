@@ -15,6 +15,9 @@ declare global {
   interface ImportMeta {
     readonly env: {
       readonly VITE_GOOGLE_MAPS_API_KEY: string;
+      // FIX: Add Supabase environment variable types to resolve TypeScript errors.
+      readonly VITE_SUPABASE_URL: string;
+      readonly VITE_SUPABASE_ANON_KEY: string;
     };
   }
 }

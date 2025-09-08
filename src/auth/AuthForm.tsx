@@ -16,10 +16,23 @@ const AuthForm: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        const err = isLogin ? await signIn(email, password) : await signUp(email, password, role);
-        if (err) {
-            addToast(err, 'error');
+
+        if (isLogin) {
+            const { error } = await signIn(email, password);
+            if (error) {
+                addToast(error.message, 'error');
+            }
+        } else {
+            const { error } = await signUp(email, password, role);
+            if (error) {
+                addToast(error.message, 'error');
+            } else {
+                addToast('Success! Please check your email to verify your account.', 'success');
+                // Optional: switch to login view after successful signup
+                setIsLogin(true);
+            }
         }
+        
         setIsLoading(false);
     };
 
@@ -28,8 +41,8 @@ const AuthForm: React.FC = () => {
             <div className="max-w-md w-full bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
                 <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-gray-200 mb-6">{isLogin ? 'Sign In' : 'Create Account'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <Input label="" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" required />
-                    <Input label="" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (use 'password123')" required />
+                    <Input label="" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" required autoComplete="email"/>
+                    <Input label="" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required minLength={6} autoComplete={isLogin ? "current-password" : "new-password"} />
                     {!isLogin && (
                         <Input
                             as="select"

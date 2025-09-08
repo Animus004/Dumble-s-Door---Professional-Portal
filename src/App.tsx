@@ -8,6 +8,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Add global declarations to fix TypeScript errors.
 declare global {
@@ -17,6 +18,9 @@ declare global {
   interface ImportMeta {
     readonly env: {
       readonly VITE_GOOGLE_MAPS_API_KEY: string;
+      // FIX: Add Supabase environment variable types to resolve TypeScript errors.
+      readonly VITE_SUPABASE_URL: string;
+      readonly VITE_SUPABASE_ANON_KEY: string;
     };
   }
 }
@@ -26,7 +30,9 @@ const App: React.FC = () => {
     <AuthProvider>
       <ThemeProvider>
         <ToastProvider>
-          <MainApp />
+          <ErrorBoundary>
+            <MainApp />
+          </ErrorBoundary>
         </ToastProvider>
       </ThemeProvider>
     </AuthProvider>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import * as ApiService from '../services/geminiService';
+import * as ApiService from '../services/supabaseService';
 import Input from '../components/Input';
 
 const Availability: React.FC = () => {
@@ -34,17 +34,17 @@ const Availability: React.FC = () => {
         const updatedClinics = [...user.veterinarian_profile.clinics];
         updatedClinics[0] = { ...updatedClinics[0], working_hours: hours };
 
-        try {
-            const updatedUser = await ApiService.updateVeterinarianProfile(user.auth_user_id, { clinics: updatedClinics });
-            setUser(updatedUser);
-            localStorage.setItem('dumble_user', JSON.stringify(updatedUser));
-            addToast('Availability updated successfully!', 'success');
-        } catch (error) {
+        const { updatedProfile, error } = await ApiService.updateVeterinarianProfile(user.auth_user_id, { clinics: updatedClinics });
+
+        if (error || !updatedProfile) {
             console.error("Failed to update availability", error);
-            addToast('Failed to update availability.', 'error');
-        } finally {
-            setIsSaving(false);
+            addToast(error?.message || 'Failed to update availability.', 'error');
+        } else {
+            setUser(updatedProfile);
+            localStorage.setItem('dumble_user', JSON.stringify(updatedProfile));
+            addToast('Availability updated successfully!', 'success');
         }
+        setIsSaving(false);
     };
 
     return (
