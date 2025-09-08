@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { UserRole } from './types';
 
 export const ROLES = {
@@ -26,7 +26,13 @@ export const ICONS = {
   ARROW_RIGHT: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>,
 };
 
-export const SIDENAV_ITEMS = {
+export interface NavItem {
+  title: string;
+  icon: JSX.Element;
+  path: string;
+}
+
+export const SIDENAV_ITEMS: Record<UserRole.Admin | UserRole.Veterinarian | UserRole.Vendor, NavItem[]> = {
   [UserRole.Admin]: [
     { title: 'Dashboard', icon: ICONS.DASHBOARD, path: 'dashboard' },
     { title: 'Verification', icon: ICONS.VERIFICATION, path: 'verification' },

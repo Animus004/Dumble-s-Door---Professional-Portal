@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus, BusinessType, Product, ProductCategory, VeterinarianProfile, VendorProfile, Clinic } from './types';
 import * as ApiService from './services/geminiService';
@@ -443,7 +444,10 @@ interface InputProps {
   children?: React.ReactNode;
 }
 
-const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement, InputProps>(
+// FIX: Correctly type the polymorphic Input component with forwardRef.
+// The ref type should be a union of possible element types, not an intersection.
+// Added type assertions for the ref when passed to the underlying element.
+const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, InputProps>(
     ({ label, name, as = 'input', children, ...props }, ref) => {
     
     const commonClasses = `mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${props.disabled ? 'bg-gray-100' : ''}`;
@@ -451,11 +455,11 @@ const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSele
     const renderInput = () => {
         switch (as) {
             case 'textarea':
-                return <textarea ref={ref} id={name} name={name} {...props} className={commonClasses + ' h-24'} />;
+                return <textarea ref={ref as React.Ref<HTMLTextAreaElement>} id={name} name={name} {...props} className={commonClasses + ' h-24'} />;
             case 'select':
-                 return <select ref={ref} id={name} name={name} {...props} className={commonClasses}>{children}</select>;
+                 return <select ref={ref as React.Ref<HTMLSelectElement>} id={name} name={name} {...props} className={commonClasses}>{children}</select>;
             default:
-                return <input ref={ref} id={name} name={name} {...props} className={commonClasses} />;
+                return <input ref={ref as React.Ref<HTMLInputElement>} id={name} name={name} {...props} className={commonClasses} />;
         }
     };
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus, BusinessType, Product, ProductCategory, VeterinarianProfile, VendorProfile, Clinic } from './types';
 import * as ApiService from './services/geminiService';
@@ -132,7 +133,7 @@ const Modal: React.FC<{isOpen: boolean, onClose: () => void, title: string, chil
 // --- LAYOUT COMPONENTS ---
 
 const Sidebar: React.FC<{ userRole: UserRole, currentPage: string, setPage: (page: string) => void, isOpen: boolean }> = ({ userRole, currentPage, setPage, isOpen }) => {
-    const navItems = SIDENAV_ITEMS[userRole] || [];
+    const navItems = SIDENAV_ITEMS[userRole as keyof typeof SIDENAV_ITEMS] || [];
     return (
         <aside className={`bg-gray-800 text-white w-64 space-y-2 py-4 flex-shrink-0 absolute lg:relative lg:translate-x-0 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} z-40`}>
              <nav>
@@ -147,7 +148,7 @@ const Sidebar: React.FC<{ userRole: UserRole, currentPage: string, setPage: (pag
     );
 };
 
-const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const DashboardLayout: React.FC = () => {
     const { user, signOut } = useAuth();
     const [page, setPage] = useState('dashboard');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -311,20 +312,20 @@ const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, 
                {ICONS.ARROW_LEFT} <span className="ml-1">Back to Queue</span>
             </button>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Review Application</h1>
-            <p className="text-gray-600 mb-6">{isVet ? (details as any).full_name : (details as any).business_name} ({profile.email})</p>
+            <p className="text-gray-600 mb-6">{isVet ? profile.veterinarian_profile?.full_name : profile.vendor_profile?.business_name} ({profile.email})</p>
 
             <div className="bg-white p-6 rounded-lg shadow space-y-4">
                 <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">{isVet ? 'Veterinarian Details' : 'Vendor Details'}</h3>
                 <p><strong>License:</strong> {details?.license_number}</p>
-                {isVet && <p><strong>Experience:</strong> {(details as any).experience_years} years</p>}
-                {isVet && <p><strong>Specializations:</strong> {(details as any).specializations.join(', ')}</p>}
-                {!isVet && <p><strong>Business Type:</strong> {(details as any).business_type}</p>}
+                {isVet && <p><strong>Experience:</strong> {profile.veterinarian_profile?.experience_years} years</p>}
+                {isVet && <p><strong>Specializations:</strong> {profile.veterinarian_profile?.specializations.join(', ')}</p>}
+                {!isVet && <p><strong>Business Type:</strong> {profile.vendor_profile?.business_type}</p>}
                 
-                {isVet && (details as any).clinics && (
+                {isVet && profile.veterinarian_profile?.clinics && (
                     <div className="pt-2">
                         <h4 className="font-semibold text-gray-700">Clinics:</h4>
                         <ul className="list-disc list-inside space-y-2 mt-2 pl-2">
-                            {(details as any).clinics.map((clinic, index) => (
+                            {profile.veterinarian_profile.clinics.map((clinic: Clinic, index: number) => (
                                 <li key={index} className="text-gray-600">
                                    <span className="font-medium text-gray-800">{clinic.clinic_name}</span> - {clinic.clinic_address} ({clinic.clinic_phone})
                                    {clinic.google_place_id && <span className="text-xs text-blue-500 ml-2">(Verified Location)</span>}
@@ -336,7 +337,7 @@ const VerificationDetails: React.FC<{ profile: UserProfile, onBack: () => void, 
 
                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mt-4">Documents</h3>
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                   {profile.verification_documents?.length > 0 ? (
+                   {profile.verification_documents && profile.verification_documents.length > 0 ? (
                       profile.verification_documents.map(doc => (
                         <button key={doc.id} onClick={() => setPreviewDocUrl(doc.document_url)} className="border rounded-lg p-3 text-center hover:bg-gray-50 transition-colors">
                           <p className="font-medium text-blue-600 capitalize">{doc.document_type.replace('_', ' ')}</p>
@@ -413,6 +414,19 @@ const AuthForm: React.FC = () => {
 
 // --- ONBOARDING COMPONENTS ---
 
+interface GooglePlace {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  international_phone_number: string;
+  geometry?: {
+    location?: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
+}
+
 const GoogleMapsApiKeyPrompt: React.FC = () => (
   <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4" aria-modal="true" role="dialog">
     <div className="bg-white rounded-lg p-8 shadow-2xl max-w-md text-center">
@@ -443,7 +457,10 @@ interface InputProps {
   children?: React.ReactNode;
 }
 
-const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement, InputProps>(
+// FIX: Correctly type the polymorphic Input component with forwardRef.
+// The ref type should be a union of possible element types, not an intersection.
+// Added type assertions for the ref when passed to the underlying element.
+const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, InputProps>(
     ({ label, name, as = 'input', children, ...props }, ref) => {
     
     const commonClasses = `mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${props.disabled ? 'bg-gray-100' : ''}`;
@@ -451,11 +468,11 @@ const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSele
     const renderInput = () => {
         switch (as) {
             case 'textarea':
-                return <textarea ref={ref} id={name} name={name} {...props} className={commonClasses + ' h-24'} />;
+                return <textarea ref={ref as React.Ref<HTMLTextAreaElement>} id={name} name={name} {...props} className={commonClasses + ' h-24'} />;
             case 'select':
-                 return <select ref={ref} id={name} name={name} {...props} className={commonClasses}>{children}</select>;
+                 return <select ref={ref as React.Ref<HTMLSelectElement>} id={name} name={name} {...props} className={commonClasses}>{children}</select>;
             default:
-                return <input ref={ref} id={name} name={name} {...props} className={commonClasses} />;
+                return <input ref={ref as React.Ref<HTMLInputElement>} id={name} name={name} {...props} className={commonClasses} />;
         }
     };
 
@@ -469,7 +486,7 @@ const Input = React.forwardRef<HTMLInputElement & HTMLTextAreaElement & HTMLSele
 Input.displayName = 'Input';
 
 
-const ProgressBar = ({ currentStep, totalSteps }) => (
+const ProgressBar: React.FC<{ currentStep: number, totalSteps: number }> = ({ currentStep, totalSteps }) => (
     <div className="flex items-center">
         {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
             <React.Fragment key={step}>
@@ -540,14 +557,18 @@ const FileUploadComponent: React.FC<{ title: string, description: string }> = ({
     );
 };
 
+interface OnboardingFormProps {
+  user: UserProfile;
+  onComplete: (user: UserProfile) => void;
+}
 
-const VeterinarianOnboardingForm = ({ user, onComplete }) => {
+const VeterinarianOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onComplete }) => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         full_name: '', license_number: '', experience_years: 0,
         emergency_available: false,
         consultation_fee: 0,
-        clinics: [{ clinic_name: '', clinic_address: '', clinic_phone: '', google_place_id: null, latitude: null, longitude: null }],
+        clinics: [{ clinic_name: '', clinic_address: '', clinic_phone: '', google_place_id: undefined, latitude: undefined, longitude: undefined } as Partial<Clinic>],
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMapsScriptLoaded, setIsMapsScriptLoaded] = useState(!!window.google);
@@ -574,33 +595,32 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
           const allScripts = document.getElementsByTagName('script');
           for (let i = 0; i < allScripts.length; i++) {
             if (allScripts[i].src.includes('maps.googleapis.com')) {
-              allScripts[i].parentNode.removeChild(allScripts[i]);
+              allScripts[i].parentNode?.removeChild(allScripts[i]);
             }
           }
         };
     }, [googleApiKey]);
 
-    const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     
-    const handleClinicChange = (index, e) => {
+    const handleClinicChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
         const updatedClinics = formData.clinics.map((clinic, i) => 
             i === index ? { ...clinic, [e.target.name]: e.target.value } : clinic
         );
         setFormData({ ...formData, clinics: updatedClinics });
     };
     
-    const handlePlaceSelected = (index, place) => {
+    const handlePlaceSelected = (index: number, place: GooglePlace) => {
         const updatedClinics = formData.clinics.map((clinic, i) => {
             if (i === index) {
                 const existingClinic = formData.clinics[i];
                 return {
                     ...existingClinic,
                     clinic_name: place.name || existingClinic.clinic_name,
-                    // Conditionally populate address and phone only if they are currently empty.
-                    clinic_address: existingClinic.clinic_address.trim() === '' 
+                    clinic_address: existingClinic.clinic_address?.trim() === '' 
                         ? (place.formatted_address || '') 
                         : existingClinic.clinic_address,
-                    clinic_phone: existingClinic.clinic_phone.trim() === '' 
+                    clinic_phone: existingClinic.clinic_phone?.trim() === '' 
                         ? (place.international_phone_number || '') 
                         : existingClinic.clinic_phone,
                     google_place_id: place.place_id,
@@ -613,18 +633,16 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
         setFormData({ ...formData, clinics: updatedClinics });
     };
 
-    const clearPlaceSelection = (index) => {
+    const clearPlaceSelection = (index: number) => {
         const updatedClinics = formData.clinics.map((clinic, i) => {
             if (i === index) {
-                // Keep the clinic name, but clear address/phone and Google data
-                // to allow manual entry.
                 return {
                     ...clinic,
                     clinic_address: '',
                     clinic_phone: '',
-                    google_place_id: null,
-                    latitude: null,
-                    longitude: null,
+                    google_place_id: undefined,
+                    latitude: undefined,
+                    longitude: undefined,
                 };
             }
             return clinic;
@@ -633,28 +651,36 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
     }
 
     const addClinic = () => {
-        setFormData({ ...formData, clinics: [...formData.clinics, { clinic_name: '', clinic_address: '', clinic_phone: '', google_place_id: null, latitude: null, longitude: null }] });
+        setFormData({ ...formData, clinics: [...formData.clinics, { clinic_name: '', clinic_address: '', clinic_phone: '', google_place_id: undefined, latitude: undefined, longitude: undefined }] });
     };
 
-    const removeClinic = (index) => {
+    const removeClinic = (index: number) => {
         if (formData.clinics.length <= 1) return; // Don't remove the last one
         const updatedClinics = formData.clinics.filter((_, i) => i !== index);
         setFormData({ ...formData, clinics: updatedClinics });
     };
 
-    const handleNext = e => { e.preventDefault(); setStep(s => s + 1); };
+    const handleNext = (e: React.FormEvent) => { e.preventDefault(); setStep(s => s + 1); };
     const handleBack = () => setStep(s => s - 1);
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        const fullProfileData = { ...formData, specializations: ['General'], bio: 'N/A', services_offered: [], languages_spoken: [] };
+        const fullProfileData = { ...formData, clinics: formData.clinics as Clinic[], specializations: ['General'], bio: 'N/A', services_offered: [], languages_spoken: [] };
         const updatedUser = await ApiService.saveVeterinarianProfile(user.auth_user_id, fullProfileData);
         onComplete(updatedUser);
     };
     
-    const AutocompleteInput = ({ clinic, index, onClinicChange, onPlaceSelected, isMapsReady }) => {
-        const inputRef = useRef(null);
+    interface AutocompleteInputProps {
+      clinic: Partial<Clinic>;
+      index: number;
+      onClinicChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
+      onPlaceSelected: (index: number, place: GooglePlace) => void;
+      isMapsReady: boolean;
+    }
+    
+    const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ clinic, index, onClinicChange, onPlaceSelected, isMapsReady }) => {
+        const inputRef = useRef<HTMLInputElement>(null);
 
         useEffect(() => {
             if (!isMapsReady || !inputRef.current) return;
@@ -668,7 +694,7 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
             });
         }, [isMapsReady, index, onPlaceSelected]);
 
-        return <Input ref={inputRef} label={`Clinic Name #${index + 1}`} name="clinic_name" value={clinic.clinic_name} onChange={e => onClinicChange(index, e)} placeholder="Start typing clinic name..." />;
+        return <Input ref={inputRef} label={`Clinic Name #${index + 1}`} name="clinic_name" value={clinic.clinic_name} onChange={e => onClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} placeholder="Start typing clinic name..." />;
     };
 
     if (!googleApiKey) return <GoogleMapsApiKeyPrompt />;
@@ -716,8 +742,8 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
                                     </button>
                                 )}
                                 <AutocompleteInput clinic={clinic} index={index} onClinicChange={handleClinicChange} onPlaceSelected={handlePlaceSelected} isMapsReady={isMapsScriptLoaded} />
-                                <Input label="Clinic Address" name="clinic_address" value={clinic.clinic_address} onChange={(e) => handleClinicChange(index, e)} disabled={placeSelected} />
-                                <Input label="Clinic Phone" name="clinic_phone" value={clinic.clinic_phone} onChange={(e) => handleClinicChange(index, e)} disabled={placeSelected} />
+                                <Input label="Clinic Address" name="clinic_address" value={clinic.clinic_address} onChange={(e) => handleClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} disabled={placeSelected} />
+                                <Input label="Clinic Phone" name="clinic_phone" value={clinic.clinic_phone} onChange={(e) => handleClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} disabled={placeSelected} />
                                 {placeSelected && (
                                     <button type="button" onClick={() => clearPlaceSelection(index)} className="text-sm text-blue-600 hover:underline">Clear & Enter Manually</button>
                                 )}
@@ -747,7 +773,7 @@ const VeterinarianOnboardingForm = ({ user, onComplete }) => {
     );
 };
 
-const VendorOnboardingForm = ({ user, onComplete }) => {
+const VendorOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onComplete }) => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         business_name: '', business_type: BusinessType.PetShop, license_number: '',
@@ -755,11 +781,11 @@ const VendorOnboardingForm = ({ user, onComplete }) => {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleNext = e => { e.preventDefault(); setStep(s => s + 1); };
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleNext = (e: React.FormEvent) => { e.preventDefault(); setStep(s => s + 1); };
     const handleBack = () => setStep(s => s - 1);
     
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
         const fullProfileData = { ...formData, description: 'N/A', delivery_available: false, operating_hours: {}, services_offered: [] };
@@ -849,6 +875,7 @@ const MyProfileVet: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return;
         setIsSaving(true);
         setSaveSuccess(false);
         try {
@@ -863,6 +890,8 @@ const MyProfileVet: React.FC = () => {
             setTimeout(() => setSaveSuccess(false), 3000);
         }
     };
+
+    if (!user) return null;
 
     return (
         <div>
@@ -898,6 +927,7 @@ const MyProfileVendor: React.FC = () => {
     
      const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return;
         setIsSaving(true);
         setSaveSuccess(false);
         try {
@@ -913,6 +943,8 @@ const MyProfileVendor: React.FC = () => {
         }
     };
     
+    if (!user) return null;
+
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Business Profile</h1>
@@ -944,15 +976,15 @@ const Availability: React.FC = () => {
 
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-    const handleTimeChange = (day, field, value) => {
-        setHours(prev => ({
+    const handleTimeChange = (day: string, field: 'start' | 'end', value: string) => {
+        setHours((prev: any) => ({
             ...prev,
             [day]: { ...prev[day], [field]: value }
         }));
     };
 
-    const handleClosedToggle = (day) => {
-        setHours(prev => ({
+    const handleClosedToggle = (day: string) => {
+        setHours((prev: any) => ({
             ...prev,
             [day]: { ...prev[day], closed: !prev[day]?.closed }
         }));
@@ -960,7 +992,7 @@ const Availability: React.FC = () => {
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user.veterinarian_profile) return;
+        if (!user?.veterinarian_profile) return;
         setIsSaving(true);
         setSaveSuccess(false);
 
@@ -980,6 +1012,8 @@ const Availability: React.FC = () => {
         }
     };
 
+    if (!user) return null;
+
     return (
          <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Manage Availability</h1>
@@ -990,12 +1024,12 @@ const Availability: React.FC = () => {
                         <div key={day} className="grid grid-cols-3 md:grid-cols-4 gap-4 items-center">
                             <span className="font-medium capitalize text-gray-700">{day}</span>
                             <div className="col-span-2 flex items-center gap-2">
-                                <Input label="" name={`${day}-start`} type="time" value={hours[day]?.start || ''} onChange={e => handleTimeChange(day, 'start', e.target.value)} disabled={hours[day]?.closed} />
+                                <Input label="" name={`${day}-start`} type="time" value={(hours as any)[day]?.start || ''} onChange={e => handleTimeChange(day, 'start', e.target.value)} disabled={(hours as any)[day]?.closed} />
                                 <span>to</span>
-                                <Input label="" name={`${day}-end`} type="time" value={hours[day]?.end || ''} onChange={e => handleTimeChange(day, 'end', e.target.value)} disabled={hours[day]?.closed} />
+                                <Input label="" name={`${day}-end`} type="time" value={(hours as any)[day]?.end || ''} onChange={e => handleTimeChange(day, 'end', e.target.value)} disabled={(hours as any)[day]?.closed} />
                             </div>
                             <div className="flex items-center">
-                                <input type="checkbox" id={`${day}-closed`} checked={hours[day]?.closed || false} onChange={() => handleClosedToggle(day)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <input type="checkbox" id={`${day}-closed`} checked={(hours as any)[day]?.closed || false} onChange={() => handleClosedToggle(day)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                 <label htmlFor={`${day}-closed`} className="ml-2 text-sm text-gray-600">Closed</label>
                             </div>
                         </div>
@@ -1041,7 +1075,7 @@ const ProductFormModal: React.FC<{
     };
     
     return (
-        <Modal isOpen={!!product} onClose={onClose} title={product?.id ? 'Edit Product' : 'Add New Product'}>
+        <Modal isOpen={true} onClose={onClose} title={product?.id ? 'Edit Product' : 'Add New Product'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input label="Product Name" name="name" value={formData.name} onChange={handleChange} />
                  <Input as="textarea" label="Description" name="description" value={formData.description} onChange={handleChange} />
@@ -1073,6 +1107,7 @@ const Products: React.FC = () => {
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     
     const fetchProducts = () => {
+        if (!user) return;
         setIsLoading(true);
         ApiService.getProductsByVendor(user.auth_user_id).then(data => {
             setProducts(data);
@@ -1080,7 +1115,7 @@ const Products: React.FC = () => {
         });
     };
     
-    useEffect(fetchProducts, [user.auth_user_id]);
+    useEffect(fetchProducts, [user]);
 
     const handleSave = async (product: Product) => {
         await ApiService.saveProduct(product);
@@ -1099,6 +1134,7 @@ const Products: React.FC = () => {
         setSelectedProduct({} as Product); // Open modal with empty product
     };
 
+    if (!user) return null;
     if (isLoading) return <Spinner />;
 
     return (
@@ -1172,13 +1208,12 @@ const MainApp: React.FC = () => {
     }
     
     // Route to onboarding if profile is not complete
-    // This is a simplified check. A real app would check for veterinarian_profile or vendor_profile existence.
     if (user.role !== UserRole.Admin && !user.veterinarian_profile && !user.vendor_profile) {
         return <OnboardingFlow />;
     }
     
     // Once onboarded, route to the appropriate dashboard
-    return <DashboardLayout>Content for {user.role}</DashboardLayout>;
+    return <DashboardLayout />;
 };
 
 export default App;

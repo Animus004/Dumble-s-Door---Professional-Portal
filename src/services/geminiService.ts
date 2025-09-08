@@ -1,7 +1,7 @@
 // This file has been repurposed to act as a mock Supabase service.
 // It simulates database and authentication interactions for the frontend.
 
-import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, BusinessType, Clinic, Product, ProductCategory, VerificationDocument, DocumentType, VerificationStatus } from '../types';
+import { UserProfile, UserRole, ProfessionalStatus, VeterinarianProfile, VendorProfile, BusinessType, Product, ProductCategory, DocumentType, VerificationStatus } from '../types';
 
 // --- MOCK DATABASE ---
 
@@ -147,7 +147,7 @@ const MOCK_PRODUCTS: Product[] = [
 
 // --- MOCK API FUNCTIONS ---
 
-export const mockSignIn = async (email: string, password: string): Promise<{ user: UserProfile, error: string | null }> => {
+export const mockSignIn = async (email: string, password: string): Promise<{ user: UserProfile | null, error: string | null }> => {
   console.log(`Attempting login for ${email}`);
   await new Promise(res => setTimeout(res, 500)); // Simulate network delay
   const user = MOCK_USERS.find(u => u.email === email);
@@ -157,7 +157,7 @@ export const mockSignIn = async (email: string, password: string): Promise<{ use
   return { user: null, error: 'Invalid email or password.' };
 };
 
-export const mockSignUp = async (email: string, password: string, role: UserRole): Promise<{ user: UserProfile, error: string | null }> => {
+export const mockSignUp = async (email: string, password: string, role: UserRole): Promise<{ user: UserProfile | null, error: string | null }> => {
     console.log(`Attempting signup for ${email} as ${role}`);
     await new Promise(res => setTimeout(res, 500));
     if (MOCK_USERS.find(u => u.email === email)) {
@@ -197,10 +197,10 @@ export const updateProfileStatus = async (userId: string, status: ProfessionalSt
     if (userIndex > -1) {
         MOCK_USERS[userIndex].professional_status = status;
         if (MOCK_USERS[userIndex].veterinarian_profile) {
-            MOCK_USERS[userIndex].veterinarian_profile.status = status;
+            MOCK_USERS[userIndex].veterinarian_profile!.status = status;
         }
          if (MOCK_USERS[userIndex].vendor_profile) {
-            MOCK_USERS[userIndex].vendor_profile.status = status;
+            MOCK_USERS[userIndex].vendor_profile!.status = status;
         }
         console.log(`Updated status for ${userId} to ${status}. Reason: ${reason || 'N/A'}`);
         return true;
@@ -295,7 +295,6 @@ export const saveProduct = async (productData: Product): Promise<Product> => {
 
 export const deleteProduct = async (productId: string): Promise<boolean> => {
     await new Promise(res => setTimeout(res, 400));
-    const initialLength = MOCK_PRODUCTS.length;
     const index = MOCK_PRODUCTS.findIndex(p => p.id === productId);
     if (index > -1) {
         MOCK_PRODUCTS.splice(index, 1);
