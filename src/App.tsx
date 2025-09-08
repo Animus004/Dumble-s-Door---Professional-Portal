@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, createContext, useContext, useRef, ChangeEvent } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus, BusinessType, Product, ProductCategory, VeterinarianProfile, VendorProfile, Clinic } from './types';
 import * as ApiService from './services/geminiService';
