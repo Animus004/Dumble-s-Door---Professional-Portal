@@ -157,7 +157,7 @@ export const mockSignIn = async (email: string, password: string): Promise<{ use
   return { user: null, error: 'Invalid email or password.' };
 };
 
-export const mockSignUp = async (email: string, password: string, role: UserRole): Promise<{ user: UserProfile | null, error: string | null }> => {
+export const mockSignUp = async (email: string, _password: string, role: UserRole): Promise<{ user: UserProfile | null, error: string | null }> => {
     console.log(`Attempting signup for ${email} as ${role}`);
     await new Promise(res => setTimeout(res, 500));
     if (MOCK_USERS.find(u => u.email === email)) {

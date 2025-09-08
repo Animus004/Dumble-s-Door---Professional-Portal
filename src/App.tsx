@@ -1,6 +1,8 @@
 
 
-import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+
+
+import React, { useState, useEffect, createContext, useContext, useRef, ChangeEvent } from 'react';
 import { UserProfile, UserRole, ProfessionalStatus, BusinessType, Product, ProductCategory, VeterinarianProfile, VendorProfile, Clinic } from './types';
 import * as ApiService from './services/geminiService';
 import { SIDENAV_ITEMS, ICONS } from './constants';
@@ -601,9 +603,9 @@ const VeterinarianOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onCom
         };
     }, [googleApiKey]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     
-    const handleClinicChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleClinicChange = (index: number, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const updatedClinics = formData.clinics.map((clinic, i) => 
             i === index ? { ...clinic, [e.target.name]: e.target.value } : clinic
         );
@@ -674,7 +676,7 @@ const VeterinarianOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onCom
     interface AutocompleteInputProps {
       clinic: Partial<Clinic>;
       index: number;
-      onClinicChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
+      onClinicChange: (index: number, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
       onPlaceSelected: (index: number, place: GooglePlace) => void;
       isMapsReady: boolean;
     }
@@ -694,7 +696,7 @@ const VeterinarianOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onCom
             });
         }, [isMapsReady, index, onPlaceSelected]);
 
-        return <Input ref={inputRef} label={`Clinic Name #${index + 1}`} name="clinic_name" value={clinic.clinic_name} onChange={e => onClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} placeholder="Start typing clinic name..." />;
+        return <Input ref={inputRef} label={`Clinic Name #${index + 1}`} name="clinic_name" value={clinic.clinic_name} onChange={e => onClinicChange(index, e)} placeholder="Start typing clinic name..." />;
     };
 
     if (!googleApiKey) return <GoogleMapsApiKeyPrompt />;
@@ -742,8 +744,8 @@ const VeterinarianOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onCom
                                     </button>
                                 )}
                                 <AutocompleteInput clinic={clinic} index={index} onClinicChange={handleClinicChange} onPlaceSelected={handlePlaceSelected} isMapsReady={isMapsScriptLoaded} />
-                                <Input label="Clinic Address" name="clinic_address" value={clinic.clinic_address} onChange={(e) => handleClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} disabled={placeSelected} />
-                                <Input label="Clinic Phone" name="clinic_phone" value={clinic.clinic_phone} onChange={(e) => handleClinicChange(index, e as React.ChangeEvent<HTMLInputElement>)} disabled={placeSelected} />
+                                <Input label="Clinic Address" name="clinic_address" value={clinic.clinic_address} onChange={(e) => handleClinicChange(index, e)} disabled={placeSelected} />
+                                <Input label="Clinic Phone" name="clinic_phone" value={clinic.clinic_phone} onChange={(e) => handleClinicChange(index, e)} disabled={placeSelected} />
                                 {placeSelected && (
                                     <button type="button" onClick={() => clearPlaceSelection(index)} className="text-sm text-blue-600 hover:underline">Clear & Enter Manually</button>
                                 )}
@@ -781,7 +783,7 @@ const VendorOnboardingForm: React.FC<OnboardingFormProps> = ({ user, onComplete 
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, [e.target.name]: e.target.value });
     const handleNext = (e: React.FormEvent) => { e.preventDefault(); setStep(s => s + 1); };
     const handleBack = () => setStep(s => s - 1);
     
@@ -869,7 +871,7 @@ const MyProfileVet: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
@@ -921,7 +923,7 @@ const MyProfileVendor: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
     
