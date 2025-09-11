@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import React from 'react';
 import { UserRole } from './types';
 import { useAuth } from './hooks/useAuth';
@@ -10,40 +12,39 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { supabaseUrl, supabaseAnonKey } from './supabaseClient'; // Import the variables
 
-// Add global declarations to fix TypeScript errors.
-declare global {
-  interface Window {
-    google: any;
-  }
-  // FIX: Extend `ImportMetaEnv` to add type definitions for environment variables
-  // instead of redeclaring `ImportMeta`. This resolves a TypeScript error about
-  // subsequent property declarations having mismatched types.
-  interface ImportMetaEnv {
-    readonly VITE_GOOGLE_MAPS_API_KEY: string;
-    readonly VITE_SUPABASE_URL: string;
-    readonly VITE_SUPABASE_ANON_KEY: string;
-  }
-}
-
+// A new component to show a clear error message
 const MissingEnvVarsError: React.FC = () => (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 text-center">
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md max-w-lg">
-        <h1 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Configuration Error</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The application is missing required environment variables for Supabase. Please make sure
-          <code className="bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-400 font-mono p-1 rounded mx-1">VITE_SUPABASE_URL</code> and
-          <code className="bg-gray-200 dark:bg-gray-700 text-red-600 dark:text-red-400 font-mono p-1 rounded mx-1">VITE_SUPABASE_ANON_KEY</code>
-          are set.
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500">
-          You may need to restart your development server after setting the variables.
-        </p>
-      </div>
+  <div className="min-h-screen flex items-center justify-center bg-red-50 text-red-800 p-4">
+    <div className="text-center">
+      <h1 className="text-2xl font-bold mb-2">Configuration Error</h1>
+      <p>The Supabase URL or Key is missing. Please set them in your environment variables.</p>
     </div>
+  </div>
+);
+
+
+const App: React.FC = () => {
+  // Check for the environment variables here, inside the component.
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return <MissingEnvVarsError />;
+  }
+
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <NotificationProvider>
+            <ErrorBoundary>
+              <MainApp />
+            </ErrorBoundary>
+          </NotificationProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
-
-
+};
 
 const MainApp: React.FC = () => {
     const { user, isLoading } = useAuth();
@@ -64,29 +65,6 @@ const MainApp: React.FC = () => {
     
     // Once onboarded, route to the appropriate dashboard
     return <DashboardLayout />;
-};
-
-const App: React.FC = () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return <MissingEnvVarsError />;
-    }
-
-    return (
-        <ErrorBoundary>
-            <ThemeProvider>
-                <ToastProvider>
-                    <AuthProvider>
-                        <NotificationProvider>
-                            <MainApp />
-                        </NotificationProvider>
-                    </AuthProvider>
-                </ToastProvider>
-            </ThemeProvider>
-        </ErrorBoundary>
-    );
 };
 
 export default App;
