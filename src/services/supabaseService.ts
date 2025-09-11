@@ -39,41 +39,49 @@ export const getSession = async () => {
 
 // --- USER PROFILE FUNCTIONS ---
 
+// FIX: Re-implemented to fetch user profile and related professional profiles
+// in a single query, which is more efficient and aligns with the database schema.
+// This resolves errors from trying to query a non-existent 'professional_profiles' table.
 export const getCurrentUserProfile = async (userId: string): Promise<UserProfile | null> => {
     const { data, error } = await supabase
-        .from('user_profiles')
-        .select(`
-            *,
-            veterinarian_profile:veterinarian_profiles(*, clinics(*)),
-            vendor_profile:vendor_profiles(*)
-        `)
-        .eq('id', userId)
-        .single();
+      .from('user_profiles')
+      .select(`
+        *,
+        veterinarian_profile:veterinarian_profiles(*, clinics(*)),
+        vendor_profile:vendor_profiles(*),
+        verification_documents:verification_documents!user_id(*)
+      `)
+      .eq('id', userId)
+      .single();
 
-    if (error) {
-        console.error("Error fetching user profile:", error.message);
+    if (error || !data) {
+        console.error("Error fetching user profile:", error?.message);
         return null;
     }
     
-    const userProfile: UserProfile = {
+    // Supabase returns a single object for a to-one relationship.
+    // The check for an array is for safety but typically not needed for one-to-one joins.
+    const vetProfile = Array.isArray(data.veterinarian_profile) ? data.veterinarian_profile[0] : data.veterinarian_profile;
+    const vendProfile = Array.isArray(data.vendor_profile) ? data.vendor_profile[0] : data.vendor_profile;
+
+    const fullProfile: UserProfile = {
         auth_user_id: data.id,
         email: data.email,
         role: data.role as UserRole,
         professional_status: data.professional_status as ProfessionalStatus,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        // FIX: Cast subscription_status to the expected union type to resolve type mismatch.
-        subscription_status: (data.subscription_status || 'free') as 'free' | 'premium',
-        // FIX: Use 'unknown' as an intermediate type for casting from 'Json' to 'NotificationPreferences' to satisfy TypeScript's type safety checks.
-        notification_preferences: (data.notification_preferences as unknown as NotificationPreferences) || { // Add default
-             in_app: { status_changes: true, new_applicants: true },
-             email: { status_changes: true, new_applicants: true }
+        subscription_status: 'free', // Default value
+        notification_preferences: (data.notification_preferences as unknown as NotificationPreferences) || {
+            in_app: { status_changes: true, new_applicants: true },
+            email: { status_changes: true, new_applicants: true }
         },
-        veterinarian_profile: Array.isArray(data.veterinarian_profile) ? data.veterinarian_profile[0] : data.veterinarian_profile,
-        vendor_profile: Array.isArray(data.vendor_profile) ? data.vendor_profile[0] : data.vendor_profile,
+        veterinarian_profile: vetProfile || undefined,
+        vendor_profile: vendProfile || undefined,
+        verification_documents: (data.verification_documents as VerificationDocument[]) || [],
     };
 
-    return userProfile;
+    return fullProfile;
 };
 
 
