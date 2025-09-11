@@ -10,7 +10,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { supabaseUrl, supabaseAnonKey } from './supabaseClient';
 
 // Add global declarations to fix TypeScript errors.
 declare global {
@@ -65,6 +64,29 @@ const MainApp: React.FC = () => {
     
     // Once onboarded, route to the appropriate dashboard
     return <DashboardLayout />;
+};
+
+const App: React.FC = () => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        return <MissingEnvVarsError />;
+    }
+
+    return (
+        <ErrorBoundary>
+            <ThemeProvider>
+                <ToastProvider>
+                    <AuthProvider>
+                        <NotificationProvider>
+                            <MainApp />
+                        </NotificationProvider>
+                    </AuthProvider>
+                </ToastProvider>
+            </ThemeProvider>
+        </ErrorBoundary>
+    );
 };
 
 export default App;

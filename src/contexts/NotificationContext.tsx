@@ -4,6 +4,7 @@ import * as ApiService from '../services/supabaseService';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { supabase } from '../supabaseClient';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -45,7 +46,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Listen for real-time notifications via Supabase Realtime
     const channel = supabase
       .channel(`public:notifications:user_id=eq.${user.auth_user_id}`)
-      .on<Notification>(
+      .on(
         'postgres_changes',
         { 
           event: 'INSERT', 
@@ -53,8 +54,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           table: 'notifications',
           filter: `user_id=eq.${user.auth_user_id}`
         },
-        (payload) => {
-          const newNotification = payload.new;
+        (payload: RealtimePostgresChangesPayload<Notification>) => {
+          // FIX: The `new` property from the Supabase payload is inferred as a union type `Notification | {}`
+          // because the generic payload type includes shapes for DELETE events. Since we are filtering for
+          // 'INSERT' events, we can safely cast `payload.new` to a `Notification`.
+          const newNotification = payload.new as Notification;
           setNotifications(prev => [newNotification, ...prev]);
           addToast("You have a new notification!", 'success');
         }

@@ -48,12 +48,12 @@ const Appointments: React.FC = () => {
             addToast("Failed to fetch appointments. This feature requires an 'appointments' table in Supabase.", 'error');
             console.error(error);
         } else if (data) {
-             const appointmentsWithMockPet = data.map(apt => ({
+             const appointmentsWithMockPet = data.map((apt: Appointment) => ({
                 ...apt,
                 // The pet's name/breed would come from a 'pets' table in a real app
                 pet_details: { name: `Pet-${(apt.pet_id || '').substring(0,4)}`, breed: 'Unknown' }
             }));
-            setAppointments(appointmentsWithMockPet as any[]);
+            setAppointments(appointmentsWithMockPet);
         }
         setIsLoading(false);
     }, [user, addToast]);

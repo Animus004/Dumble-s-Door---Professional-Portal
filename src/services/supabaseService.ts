@@ -110,8 +110,8 @@ export const getPendingVerifications = async () => {
     }
     
     const userProfiles: UserProfile[] = (data || [])
-        .filter(p => !!p.veterinarian_profile || !!p.vendor_profile)
-        .map(p => ({
+        .filter((p: any) => !!p.veterinarian_profile || !!p.vendor_profile)
+        .map((p: any) => ({
             auth_user_id: p.id,
             email: p.email,
             role: p.role as UserRole,
