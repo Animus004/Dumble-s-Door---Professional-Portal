@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import React from 'react';
 import { UserRole } from './types';
 import { useAuth } from './hooks/useAuth';
@@ -14,19 +12,26 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { supabaseUrl, supabaseAnonKey } from './supabaseClient'; // Import the variables
 
+// Add global declarations to fix TypeScript errors.
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
 // A new component to show a clear error message
 const MissingEnvVarsError: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-red-50 text-red-800 p-4">
     <div className="text-center">
       <h1 className="text-2xl font-bold mb-2">Configuration Error</h1>
-      <p>The Supabase URL or Key is missing. Please set them in your environment variables.</p>
+      <p>The Supabase URL or Key is missing. Please set them as Environment Variables in your Vercel project settings.</p>
     </div>
   </div>
 );
 
 
 const App: React.FC = () => {
-  // Check for the environment variables here, inside the component.
+  // This check now happens safely inside the component
   if (!supabaseUrl || !supabaseAnonKey) {
     return <MissingEnvVarsError />;
   }
@@ -56,14 +61,12 @@ const MainApp: React.FC = () => {
     if (!user) {
         return <AuthForm />;
     }
-    
-    // Route to onboarding if profile is not complete
+
     const isProfileIncomplete = user.role !== UserRole.Admin && !user.veterinarian_profile && !user.vendor_profile;
     if (isProfileIncomplete) {
         return <OnboardingFlow />;
     }
-    
-    // Once onboarded, route to the appropriate dashboard
+
     return <DashboardLayout />;
 };
 

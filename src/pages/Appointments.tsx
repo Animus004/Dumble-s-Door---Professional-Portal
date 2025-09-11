@@ -48,8 +48,14 @@ const Appointments: React.FC = () => {
             addToast("Failed to fetch appointments. This feature requires an 'appointments' table in Supabase.", 'error');
             console.error(error);
         } else if (data) {
-             const appointmentsWithMockPet = data.map((apt: Appointment) => ({
+            // FIX: Correctly map the data from Supabase to the `Appointment` type.
+            // The `status` from the DB is a string literal, so it needs to be cast to the `AppointmentStatus` enum.
+            // Also, handle `null` for optional fields to satisfy TypeScript's strict null checks.
+             const appointmentsWithMockPet: Appointment[] = data.map((apt) => ({
                 ...apt,
+                status: apt.status as AppointmentStatus,
+                notes: apt.notes ?? undefined,
+                user_profiles: apt.user_profiles ?? undefined,
                 // The pet's name/breed would come from a 'pets' table in a real app
                 pet_details: { name: `Pet-${(apt.pet_id || '').substring(0,4)}`, breed: 'Unknown' }
             }));
