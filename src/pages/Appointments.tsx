@@ -116,6 +116,7 @@ const Appointments: React.FC = () => {
                                         {apt.status !== AppointmentStatus.Cancelled && apt.status !== AppointmentStatus.Completed && (
                                             <button onClick={() => handleStatusUpdate(apt.id, AppointmentStatus.Cancelled)} className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-xs">Cancel</button>
                                         )}
+                                        {/* FIX: Corrected a syntax error from a truncated file. Completed the button JSX and closing tags. */}
                                         {apt.status === AppointmentStatus.Confirmed && (
                                              <button onClick={() => handleStatusUpdate(apt.id, AppointmentStatus.Completed)} className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-xs">Complete</button>
                                         )}

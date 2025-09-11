@@ -39,6 +39,40 @@ const VerificationQueueSkeleton: React.FC = () => (
     </div>
 );
 
+const Pagination: React.FC<{
+    currentPage: number;
+    totalCount: number;
+    pageSize: number;
+    onPageChange: (page: number) => void;
+}> = ({ currentPage, totalCount, pageSize, onPageChange }) => {
+    const totalPages = Math.ceil(totalCount / pageSize);
+    if (totalPages <= 1) return null;
+
+    return (
+        <div className="flex items-center justify-between mt-4 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
+            <span className="text-sm text-gray-700 dark:text-gray-400">
+                Showing <span className="font-semibold">{Math.min((currentPage - 1) * pageSize + 1, totalCount)}</span> to <span className="font-semibold">{Math.min(currentPage * pageSize, totalCount)}</span> of <span className="font-semibold">{totalCount}</span> results
+            </span>
+            <div className="space-x-2">
+                <button 
+                    onClick={() => onPageChange(currentPage - 1)} 
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Previous
+                </button>
+                <button 
+                    onClick={() => onPageChange(currentPage + 1)} 
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 const VerificationQueue: React.FC = () => {
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -51,6 +85,8 @@ const VerificationQueue: React.FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const { addToast } = useToast();
     const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
 
     const fetchVerifications = useCallback(async () => {
         setIsLoading(true);
@@ -76,13 +112,24 @@ const VerificationQueue: React.FC = () => {
             return searchMatch && roleMatch;
         });
     }, [profiles, searchTerm, roleFilter]);
+    
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, roleFilter]);
+
+    const paginatedProfiles = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredProfiles.slice(start, start + pageSize);
+    }, [filteredProfiles, currentPage, pageSize]);
 
     useEffect(() => {
         if (selectAllCheckboxRef.current) {
-            const isIndeterminate = selectedIds.size > 0 && selectedIds.size < filteredProfiles.length;
-            selectAllCheckboxRef.current.indeterminate = isIndeterminate;
+            const numSelected = selectedIds.size;
+            const numVisible = filteredProfiles.length;
+            selectAllCheckboxRef.current.checked = numSelected > 0 && numSelected === numVisible;
+            selectAllCheckboxRef.current.indeterminate = numSelected > 0 && numSelected < numVisible;
         }
-    }, [selectedIds, filteredProfiles.length]);
+    }, [selectedIds, filteredProfiles]);
     
     const handleSelectOne = (id: string) => {
         const newSelectedIds = new Set(selectedIds);
@@ -196,49 +243,57 @@ const VerificationQueue: React.FC = () => {
             )}
 
             {isLoading ? <VerificationQueueSkeleton /> : (
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th className="px-6 py-3 w-12">
-                                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900" 
-                                        ref={selectAllCheckboxRef}
-                                        onChange={handleSelectAll}
-                                        checked={selectedIds.size > 0 && selectedIds.size === filteredProfiles.length}
-                                    />
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {filteredProfiles.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No matching pending verifications.</td></tr>
-                            ) : filteredProfiles.map(p => (
-                                <tr key={p.auth_user_id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedIds.has(p.auth_user_id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
-                                    <td className="px-6 py-4">
-                                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900"
-                                            onChange={() => handleSelectOne(p.auth_user_id)}
-                                            checked={selectedIds.has(p.auth_user_id)}
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th className="px-6 py-3 w-12">
+                                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900" 
+                                            ref={selectAllCheckboxRef}
+                                            onChange={handleSelectAll}
+                                            checked={selectedIds.size > 0 && selectedIds.size === filteredProfiles.length}
                                         />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-200">{p.veterinarian_profile?.full_name || p.vendor_profile?.business_name}</div>
-                                        <div className="text-sm text-gray-500 dark:text-gray-400">{p.email}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{p.role.replace('_', ' ')}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{new Date(p.created_at).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap"><Badge status={p.professional_status} /></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => setSelectedProfile(p)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">Review</button>
-                                    </td>
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name / Business</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Submitted</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {paginatedProfiles.length === 0 ? (
+                                    <tr><td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No matching pending verifications.</td></tr>
+                                ) : paginatedProfiles.map(p => (
+                                    <tr key={p.auth_user_id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedIds.has(p.auth_user_id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+                                        <td className="px-6 py-4">
+                                            <input type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-100 dark:bg-gray-900"
+                                                onChange={() => handleSelectOne(p.auth_user_id)}
+                                                checked={selectedIds.has(p.auth_user_id)}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-200">{p.veterinarian_profile?.full_name || p.vendor_profile?.business_name}</div>
+                                            <div className="text-sm text-gray-500 dark:text-gray-400">{p.email}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{p.role.replace('_', ' ')}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{new Date(p.created_at).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap"><Badge status={p.professional_status} /></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button onClick={() => setSelectedProfile(p)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">Review</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                     <Pagination 
+                        currentPage={currentPage}
+                        totalCount={filteredProfiles.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             )}
         </div>

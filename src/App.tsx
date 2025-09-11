@@ -17,13 +17,13 @@ declare global {
   interface Window {
     google: any;
   }
-  interface ImportMeta {
-    readonly env: {
-      readonly VITE_GOOGLE_MAPS_API_KEY: string;
-      // FIX: Add Supabase environment variable types to resolve TypeScript errors.
-      readonly VITE_SUPABASE_URL: string;
-      readonly VITE_SUPABASE_ANON_KEY: string;
-    };
+  // FIX: Extend `ImportMetaEnv` to add type definitions for environment variables
+  // instead of redeclaring `ImportMeta`. This resolves a TypeScript error about
+  // subsequent property declarations having mismatched types.
+  interface ImportMetaEnv {
+    readonly VITE_GOOGLE_MAPS_API_KEY: string;
+    readonly VITE_SUPABASE_URL: string;
+    readonly VITE_SUPABASE_ANON_KEY: string;
   }
 }
 

@@ -66,11 +66,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return ApiService.signIn(email, pass);
   };
   
-  // FIX: Resolve return type mismatch for the signUp function.
-  // The original implementation returned a `Promise<AuthResponse>`, which did not match the
-  // `Promise<{ user: User | null; error: AuthError | null }>` type defined in `AuthContextType`.
-  // This fix destructures the response from `ApiService.signUp` and returns an object
-  // with the correct shape (`{ user, error }`).
   const signUp: AuthContextType['signUp'] = async (email, pass, role) => {
      const { data, error } = await ApiService.signUp(email, pass, role);
      return { user: data.user, error };
