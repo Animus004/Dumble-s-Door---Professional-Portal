@@ -44,25 +44,7 @@ const MissingEnvVarsError: React.FC = () => (
     </div>
   );
 
-const App: React.FC = () => {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return <MissingEnvVarsError />;
-  }
-  
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <ToastProvider>
-          <NotificationProvider>
-            <ErrorBoundary>
-              <MainApp />
-            </ErrorBoundary>
-          </NotificationProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </AuthProvider>
-  );
-};
+
 
 const MainApp: React.FC = () => {
     const { user, isLoading } = useAuth();
